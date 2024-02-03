@@ -36,3 +36,17 @@ nav ul li a:hover {
     text-align: center;
     margin: 20px 0;
 }
+body, html {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+    background-image: url('daniele-colucci-OtXJhYjbKeg-unsplash.jpg');
+    background-size: cover;
+    background-position: center;
+    height: 100vh; /* This ensures that the background covers the full viewport height */
+}
+
+nav {
+    background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent nav to make text readable against the Mars background */
+    overflow: hidden;
+}
