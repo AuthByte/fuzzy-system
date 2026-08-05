@@ -6,6 +6,9 @@ export const CONFIG = {
   /** Namespace used for custom commands and script events. */
   namespace: "blocklogger",
 
+  /** Chat prefix commands, e.g. "!bl help" — no experiments / no slash needed. */
+  chatPrefix: "!bl",
+
   /**
    * Max characters stored in a single world dynamic property chunk.
    * Bedrock string dynamic properties allow up to 32767; stay under that.

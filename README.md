@@ -2,6 +2,16 @@
 
 CoreProtect-style logging for **Minecraft Bedrock Edition**. Records every player block place and break with player name, block type, action, coordinates, dimension, and timestamp. Supports lookup, inspect, rollback, and restore.
 
+## No experiments required
+
+This pack uses the **stable** `@minecraft/server` Script API only.
+
+- **Do not** enable Beta APIs / Experiments
+- Works on **existing worlds** — just activate the behavior pack
+- You generally **cannot** turn Beta APIs on after a world is created anyway; with this pack you don’t need to
+
+(If an old guide told you to flip Beta APIs: ignore that. That was for beta/unstable script modules.)
+
 ## What gets logged
 
 ```json
@@ -19,31 +29,36 @@ Break events also store block states so rollbacks can restore stairs, slabs, log
 
 ## Requirements
 
-- Minecraft Bedrock **1.21.100+** (Script API `@minecraft/server` 2.1.0+)
-- **Beta APIs** enabled in world settings (Experiments → Beta APIs)
-- Cheats / operator permission for rollback commands
+- Minecraft Bedrock **1.21.100+**
+- Stable Script API (`@minecraft/server` 2.1.0+ in the manifest — **not** a `-beta` version)
+- Operator permission for rollback/restore
+- **No** Experiments / Beta APIs toggle
 
-## Install
+## Install (existing world is fine)
 
-### Option A — Folder (dev / Realms upload)
+1. Copy `packs/BlockLogger_BP` into the world’s `behavior_packs` folder  
+   **or** import `BlockLogger_BP.mcpack` (`python3 tools/package.py` to build it).
+2. Edit world → **Behavior Packs** → activate **BlockLogger**.
+3. Load the world. You should see a chat message that logging is on.
 
-1. Copy `packs/BlockLogger_BP` into your world's `behavior_packs` folder  
-   **or** into `development_behavior_packs` for local testing.
-2. Create/open a world → **Behavior Packs** → activate **BlockLogger**.
-3. Enable **Beta APIs** under Experiments.
-4. Load the world.
-
-### Option B — `.mcpack`
-
-```bash
-python3 tools/package.py
-```
-
-Then double-click `dist/BlockLogger_BP.mcpack` (or import it in Minecraft).
+That’s it. No experiment screens.
 
 ## Commands
 
-All commands are also available without the namespace in chat (e.g. `/inspect`), but prefer the namespaced form in command blocks and functions.
+Easiest: chat prefix (no slash needed):
+
+```
+!bl help
+!bl inspect
+!bl lookup Finn
+!bl near 16
+!bl rollback Finn 1h
+!bl rollbackhere 30m 12
+!bl restore 3
+!bl stats
+```
+
+Slash commands (also registered when available):
 
 | Command | Description |
 |---|---|
@@ -60,20 +75,7 @@ All commands are also available without the namespace in chat (e.g. `/inspect`),
 
 **Time formats:** `30s`, `5m`, `2h`, `1d`, `1w` (bare numbers = minutes).
 
-### Examples
-
-```
-/blocklogger:inspect
-/blocklogger:lookup Finn
-/blocklogger:near 16
-/blocklogger:rollback Finn 1h
-/blocklogger:rollbackhere 30m 12
-/blocklogger:restore 3
-```
-
 ### Script-event fallback
-
-If custom commands are unavailable:
 
 ```
 /scriptevent blocklogger:lookup Finn
@@ -81,27 +83,33 @@ If custom commands are unavailable:
 /scriptevent blocklogger:help
 ```
 
+## Where logs are stored
+
+Inside the **world** as Script API dynamic properties (not a normal text file). Survives restarts. Soft-capped (default 8000 entries).
+
+Outbound HTTP to a website is optional and mainly for Bedrock Dedicated Server setups — see `httpEndpoint` in `config.js`.
+
 ## How it works
 
-1. Subscribes to `world.afterEvents.playerPlaceBlock` and `playerBreakBlock`.
-2. Appends a compact log entry to **world dynamic properties** (survives restarts).
-3. Chunks storage across multiple properties to stay under the per-property string limit.
-4. Prunes oldest entries when the soft cap (`maxEntries`, default 8000) is exceeded.
-5. Rollback walks matching entries newest-first and applies the inverse (placed → air, broken → restored block + states).
+1. Subscribes to stable `playerPlaceBlock` / `playerBreakBlock` after-events.
+2. Appends compact entries to world dynamic properties.
+3. Chunks storage under the per-property string limit; prunes oldest when over cap.
+4. Rollback applies inverses (placed → air, broken → restored block + states).
 
 ## Configuration
 
 Edit `packs/BlockLogger_BP/scripts/config.js`:
 
+- `chatPrefix` — default `!bl`
 - `maxEntries` — soft cap before pruning
 - `lookupLimit` — chat result page size
 - `maxRollbackBlocks` — safety limit per rollback
-- `httpEndpoint` — optional URL for external logging (BDS / custom runtime with `fetch`)
+- `httpEndpoint` — optional URL for external logging
 - `debugConsole` — echo every log to content log
 
 ## Limitations
 
-Player place/break logging is solid. These are **not** fully attributed with the standard API alone:
+Not fully attributed with the standard API alone:
 
 - Explosions without a clear player source
 - Fluid flow
@@ -118,7 +126,7 @@ packs/BlockLogger_BP/
     config.js      # tunables
     logger.js      # place/break listeners
     storage.js     # dynamic-property store
-    commands.js    # slash + scriptevent UI
+    commands.js    # slash + chat + scriptevent UI
     rollback.js    # rollback / restore jobs
     format.js      # entry formatting
     time.js        # duration parsing

@@ -4,6 +4,7 @@ import {
   CustomCommandStatus,
   Player,
   system,
+  world,
 } from "@minecraft/server";
 import { CONFIG } from "./config.js";
 import { formatEntryLine, toPublicJson } from "./format.js";
@@ -29,6 +30,29 @@ function getPlayer(origin) {
   const source = origin.initiator ?? origin.sourceEntity;
   if (source instanceof Player) return source;
   return undefined;
+}
+
+/**
+ * Operator-ish check for chat-prefix admin actions (stable API).
+ * @param {Player} player
+ * @returns {boolean}
+ */
+function canManageWorld(player) {
+  try {
+    const level = player.commandPermissionLevel;
+    // Any / GameDirectors / Admin / Host / Owner — treat above Any as allowed.
+    if (level !== undefined && level !== CommandPermissionLevel.Any) {
+      return true;
+    }
+  } catch {
+    // fall through
+  }
+  try {
+    if (typeof player.isOp === "function" && player.isOp()) return true;
+  } catch {
+    // fall through
+  }
+  return false;
 }
 
 /**
@@ -70,11 +94,7 @@ function inspectLook(player) {
     { limit: CONFIG.lookupLimit }
   );
 
-  sendLookupResults(
-    player,
-    entries,
-    `History at ${x} ${y} ${z}`
-  );
+  sendLookupResults(player, entries, `History at ${x} ${y} ${z}`);
 
   if (entries[0]) {
     player.sendMessage(
@@ -100,11 +120,9 @@ function lookupPlayer(player, name, limit = CONFIG.lookupLimit) {
  */
 function lookupNear(player, radius) {
   const r = Math.min(Math.max(1, radius), CONFIG.maxNearRadius);
-  const { x: cx, y: cy, z: cz } = {
-    x: Math.floor(player.location.x),
-    y: Math.floor(player.location.y),
-    z: Math.floor(player.location.z),
-  };
+  const cx = Math.floor(player.location.x);
+  const cy = Math.floor(player.location.y);
+  const cz = Math.floor(player.location.z);
   const dim = player.dimension.id;
   const r2 = r * r;
 
@@ -152,16 +170,16 @@ function showStats(player) {
  */
 function showHelp(player) {
   const ns = CONFIG.namespace;
-  player.sendMessage("§a[BlockLogger] Commands:");
-  player.sendMessage(`§f/${ns}:inspect §7- history of the block you look at`);
-  player.sendMessage(`§f/${ns}:lookup <player> §7- recent actions by player`);
-  player.sendMessage(`§f/${ns}:near [radius] §7- recent actions near you`);
-  player.sendMessage(`§f/${ns}:coords <x> <y> <z> §7- history at coordinates`);
-  player.sendMessage(`§f/${ns}:rollback <player> <time> §7- e.g. Finn 1h`);
-  player.sendMessage(`§f/${ns}:rollbackhere <time> [radius] §7- rollback near you`);
-  player.sendMessage(`§f/${ns}:restore <id> §7- undo a rollback batch`);
-  player.sendMessage(`§f/${ns}:stats §7- storage usage`);
-  player.sendMessage(`§f/${ns}:export §7- dump latest match as JSON in chat`);
+  const prefix = CONFIG.chatPrefix;
+  player.sendMessage("§a[BlockLogger] No experiments required. Commands:");
+  player.sendMessage(`§f/${ns}:inspect §7or §f${prefix} inspect`);
+  player.sendMessage(`§f/${ns}:lookup <player> §7or §f${prefix} lookup <player>`);
+  player.sendMessage(`§f/${ns}:near [radius] §7or §f${prefix} near [radius]`);
+  player.sendMessage(`§f/${ns}:coords <x> <y> <z>`);
+  player.sendMessage(`§f/${ns}:rollback <player> <time> §7e.g. Finn 1h`);
+  player.sendMessage(`§f/${ns}:rollbackhere <time> [radius]`);
+  player.sendMessage(`§f/${ns}:restore <id>`);
+  player.sendMessage(`§f/${ns}:stats §7· §f/${ns}:export <player> §7· §f${prefix} help`);
   player.sendMessage("§7Time formats: §f30s§7, §f5m§7, §f2h§7, §f1d§7, §f1w");
 }
 
@@ -180,7 +198,108 @@ function exportLatest(player, name) {
 }
 
 /**
- * Register slash commands.
+ * Shared action router used by slash commands, chat prefix, and scriptevents.
+ * @param {Player} player
+ * @param {string} action
+ * @param {string[]} parts
+ */
+export function handleAction(player, action, parts = []) {
+  switch (action) {
+    case "help":
+      showHelp(player);
+      break;
+    case "inspect":
+      inspectLook(player);
+      break;
+    case "lookup":
+      if (!parts[0]) {
+        player.sendMessage(`§eUsage: ${CONFIG.chatPrefix} lookup <player>`);
+        break;
+      }
+      lookupPlayer(player, parts[0], Number(parts[1]) || CONFIG.lookupLimit);
+      break;
+    case "near":
+      lookupNear(player, Number(parts[0]) || CONFIG.defaultNearRadius);
+      break;
+    case "coords":
+      if (parts.length < 3) {
+        player.sendMessage(`§eUsage: ${CONFIG.chatPrefix} coords <x> <y> <z>`);
+        break;
+      }
+      lookupCoords(player, Number(parts[0]), Number(parts[1]), Number(parts[2]));
+      break;
+    case "rollback":
+      if (parts.length < 2) {
+        player.sendMessage(`§eUsage: ${CONFIG.chatPrefix} rollback <player> <time>`);
+        break;
+      }
+      {
+        const duration = parseDuration(parts[1]);
+        if (duration === undefined) {
+          player.sendMessage("§cInvalid time. Use 30s, 5m, 2h, 1d, or 1w.");
+          break;
+        }
+        if (!canManageWorld(player)) {
+          player.sendMessage("§c[BlockLogger] Rollback requires operator permission.");
+          break;
+        }
+        rollbackPlayerSince(player, parts[0], duration);
+      }
+      break;
+    case "rollbackhere":
+      {
+        const duration = parseDuration(parts[0]);
+        if (duration === undefined) {
+          player.sendMessage("§cInvalid time. Use 30s, 5m, 2h, 1d, or 1w.");
+          break;
+        }
+        if (!canManageWorld(player)) {
+          player.sendMessage("§c[BlockLogger] Rollback requires operator permission.");
+          break;
+        }
+        const r = Math.min(
+          Math.max(1, Number(parts[1]) || CONFIG.defaultNearRadius),
+          CONFIG.maxNearRadius
+        );
+        const candidates = findRollbackCandidates({
+          sinceMs: nowMs() - duration,
+          cx: Math.floor(player.location.x),
+          cy: Math.floor(player.location.y),
+          cz: Math.floor(player.location.z),
+          radius: r,
+          dimensionId: player.dimension.id,
+        });
+        runRollback(player, candidates);
+      }
+      break;
+    case "restore":
+      if (!parts[0]) {
+        player.sendMessage(`§eUsage: ${CONFIG.chatPrefix} restore <id>`);
+        break;
+      }
+      if (!canManageWorld(player)) {
+        player.sendMessage("§c[BlockLogger] Restore requires operator permission.");
+        break;
+      }
+      runRestore(player, Number(parts[0]));
+      break;
+    case "stats":
+      showStats(player);
+      break;
+    case "export":
+      if (!parts[0]) {
+        player.sendMessage(`§eUsage: ${CONFIG.chatPrefix} export <player>`);
+        break;
+      }
+      exportLatest(player, parts[0]);
+      break;
+    default:
+      player.sendMessage(`§eUnknown BlockLogger action: ${action}. Try ${CONFIG.chatPrefix} help`);
+  }
+}
+
+/**
+ * Register slash commands (stable Script API — no Beta APIs experiment).
  * @param {import("@minecraft/server").CustomCommandRegistry} registry
  */
 export function registerCommands(registry) {
@@ -198,7 +317,7 @@ export function registerCommands(registry) {
       if (!player) {
         return { status: CustomCommandStatus.Failure, message: "Players only." };
       }
-      system.run(() => showHelp(player));
+      system.run(() => handleAction(player, "help"));
       return { status: CustomCommandStatus.Success };
     }
   );
@@ -215,7 +334,7 @@ export function registerCommands(registry) {
       if (!player) {
         return { status: CustomCommandStatus.Failure, message: "Players only." };
       }
-      system.run(() => inspectLook(player));
+      system.run(() => handleAction(player, "inspect"));
       return { status: CustomCommandStatus.Success };
     }
   );
@@ -234,9 +353,9 @@ export function registerCommands(registry) {
       if (!player) {
         return { status: CustomCommandStatus.Failure, message: "Players only." };
       }
-      system.run(() =>
-        lookupPlayer(player, playerName, limit ?? CONFIG.lookupLimit)
-      );
+      const args = [playerName];
+      if (limit !== undefined) args.push(String(limit));
+      system.run(() => handleAction(player, "lookup", args));
       return { status: CustomCommandStatus.Success };
     }
   );
@@ -254,9 +373,8 @@ export function registerCommands(registry) {
       if (!player) {
         return { status: CustomCommandStatus.Failure, message: "Players only." };
       }
-      system.run(() =>
-        lookupNear(player, radius ?? CONFIG.defaultNearRadius)
-      );
+      const args = radius !== undefined ? [String(radius)] : [];
+      system.run(() => handleAction(player, "near", args));
       return { status: CustomCommandStatus.Success };
     }
   );
@@ -278,7 +396,7 @@ export function registerCommands(registry) {
       if (!player) {
         return { status: CustomCommandStatus.Failure, message: "Players only." };
       }
-      system.run(() => lookupCoords(player, x, y, z));
+      system.run(() => handleAction(player, "coords", [String(x), String(y), String(z)]));
       return { status: CustomCommandStatus.Success };
     }
   );
@@ -299,14 +417,13 @@ export function registerCommands(registry) {
       if (!player) {
         return { status: CustomCommandStatus.Failure, message: "Players only." };
       }
-      const duration = parseDuration(timeText);
-      if (duration === undefined) {
+      if (parseDuration(timeText) === undefined) {
         return {
           status: CustomCommandStatus.Failure,
           message: "Invalid time. Use 30s, 5m, 2h, 1d, or 1w.",
         };
       }
-      system.run(() => rollbackPlayerSince(player, playerName, duration));
+      system.run(() => handleAction(player, "rollback", [playerName, timeText]));
       return { status: CustomCommandStatus.Success };
     }
   );
@@ -325,29 +442,15 @@ export function registerCommands(registry) {
       if (!player) {
         return { status: CustomCommandStatus.Failure, message: "Players only." };
       }
-      const duration = parseDuration(timeText);
-      if (duration === undefined) {
+      if (parseDuration(timeText) === undefined) {
         return {
           status: CustomCommandStatus.Failure,
           message: "Invalid time. Use 30s, 5m, 2h, 1d, or 1w.",
         };
       }
-      const r = Math.min(
-        Math.max(1, radius ?? CONFIG.defaultNearRadius),
-        CONFIG.maxNearRadius
-      );
-      system.run(() => {
-        const sinceMs = nowMs() - duration;
-        const candidates = findRollbackCandidates({
-          sinceMs,
-          cx: Math.floor(player.location.x),
-          cy: Math.floor(player.location.y),
-          cz: Math.floor(player.location.z),
-          radius: r,
-          dimensionId: player.dimension.id,
-        });
-        runRollback(player, candidates);
-      });
+      const args = [timeText];
+      if (radius !== undefined) args.push(String(radius));
+      system.run(() => handleAction(player, "rollbackhere", args));
       return { status: CustomCommandStatus.Success };
     }
   );
@@ -365,7 +468,7 @@ export function registerCommands(registry) {
       if (!player) {
         return { status: CustomCommandStatus.Failure, message: "Players only." };
       }
-      system.run(() => runRestore(player, id));
+      system.run(() => handleAction(player, "restore", [String(id)]));
       return { status: CustomCommandStatus.Success };
     }
   );
@@ -382,7 +485,7 @@ export function registerCommands(registry) {
       if (!player) {
         return { status: CustomCommandStatus.Failure, message: "Players only." };
       }
-      system.run(() => showStats(player));
+      system.run(() => handleAction(player, "stats"));
       return { status: CustomCommandStatus.Success };
     }
   );
@@ -400,18 +503,38 @@ export function registerCommands(registry) {
       if (!player) {
         return { status: CustomCommandStatus.Failure, message: "Players only." };
       }
-      system.run(() => exportLatest(player, playerName));
+      system.run(() => handleAction(player, "export", [playerName]));
       return { status: CustomCommandStatus.Success };
     }
   );
 }
 
 /**
- * Fallback interface via /scriptevent for environments without custom command UX.
- * Examples:
- *   /scriptevent blocklogger:help
- *   /scriptevent blocklogger:lookup Finn
- *   /scriptevent blocklogger:rollback Finn 1h
+ * Chat prefix commands: "!bl help", "!bl lookup Finn", etc.
+ * Works on existing worlds with no experiments and no slash-command registration.
+ */
+export function registerChatCommands() {
+  const prefix = CONFIG.chatPrefix.toLowerCase();
+
+  world.beforeEvents.chatSend.subscribe((event) => {
+    const message = (event.message ?? "").trim();
+    const lower = message.toLowerCase();
+    if (!lower.startsWith(prefix)) return;
+
+    const rest = message.slice(prefix.length).trim();
+    if (!rest && lower !== prefix) return;
+
+    event.cancel = true;
+    const player = event.sender;
+    const tokens = rest ? rest.split(/\s+/) : [];
+    const action = (tokens.shift() || "help").toLowerCase();
+
+    system.run(() => handleAction(player, action, tokens));
+  });
+}
+
+/**
+ * Fallback via /scriptevent blocklogger:<action> <args>
  */
 export function registerScriptEvents() {
   system.afterEvents.scriptEventReceive.subscribe(
@@ -424,93 +547,12 @@ export function registerScriptEvents() {
             : undefined;
       if (!player) return;
 
-      const id = event.id; // e.g. blocklogger:lookup
+      const id = event.id;
       const message = (event.message ?? "").trim();
       const parts = message ? message.split(/\s+/) : [];
       const action = id.includes(":") ? id.split(":")[1] : id;
 
-      system.run(() => {
-        switch (action) {
-          case "help":
-            showHelp(player);
-            break;
-          case "inspect":
-            inspectLook(player);
-            break;
-          case "lookup":
-            if (!parts[0]) {
-              player.sendMessage("§eUsage: /scriptevent blocklogger:lookup <player>");
-              break;
-            }
-            lookupPlayer(player, parts[0], Number(parts[1]) || CONFIG.lookupLimit);
-            break;
-          case "near":
-            lookupNear(player, Number(parts[0]) || CONFIG.defaultNearRadius);
-            break;
-          case "coords":
-            if (parts.length < 3) {
-              player.sendMessage("§eUsage: /scriptevent blocklogger:coords <x> <y> <z>");
-              break;
-            }
-            lookupCoords(player, Number(parts[0]), Number(parts[1]), Number(parts[2]));
-            break;
-          case "rollback":
-            if (parts.length < 2) {
-              player.sendMessage("§eUsage: /scriptevent blocklogger:rollback <player> <time>");
-              break;
-            }
-            {
-              const duration = parseDuration(parts[1]);
-              if (duration === undefined) {
-                player.sendMessage("§cInvalid time. Use 30s, 5m, 2h, 1d, or 1w.");
-                break;
-              }
-              rollbackPlayerSince(player, parts[0], duration);
-            }
-            break;
-          case "rollbackhere":
-            {
-              const duration = parseDuration(parts[0]);
-              if (duration === undefined) {
-                player.sendMessage("§cInvalid time. Use 30s, 5m, 2h, 1d, or 1w.");
-                break;
-              }
-              const r = Math.min(
-                Math.max(1, Number(parts[1]) || CONFIG.defaultNearRadius),
-                CONFIG.maxNearRadius
-              );
-              const candidates = findRollbackCandidates({
-                sinceMs: nowMs() - duration,
-                cx: Math.floor(player.location.x),
-                cy: Math.floor(player.location.y),
-                cz: Math.floor(player.location.z),
-                radius: r,
-                dimensionId: player.dimension.id,
-              });
-              runRollback(player, candidates);
-            }
-            break;
-          case "restore":
-            if (!parts[0]) {
-              player.sendMessage("§eUsage: /scriptevent blocklogger:restore <id>");
-              break;
-            }
-            runRestore(player, Number(parts[0]));
-            break;
-          case "stats":
-            showStats(player);
-            break;
-          case "export":
-            if (!parts[0]) {
-              player.sendMessage("§eUsage: /scriptevent blocklogger:export <player>");
-              break;
-            }
-            exportLatest(player, parts[0]);
-            break;
-          default:
-            player.sendMessage(`§eUnknown BlockLogger action: ${action}. Try help.`);
-        }
-      });
+      system.run(() => handleAction(player, action, parts));
     },
     { namespaces: [CONFIG.namespace] }
   );
