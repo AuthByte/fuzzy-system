@@ -4,7 +4,7 @@
     "name": "BlockLogger",
     "description": "Block place/break logging with lookup + rollback. Stable Script API only — no Beta APIs / experiments required. Works on existing worlds.",
     "uuid": "d3c99637-e078-40ef-be79-7a243d096396",
-    "version": [1, 3, 0],
+    "version": [1, 3, 1],
     "min_engine_version": [1, 21, 100]
   },
   "modules": [

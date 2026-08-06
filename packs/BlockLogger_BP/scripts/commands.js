@@ -180,7 +180,8 @@ function showHelp(player) {
   player.sendMessage(`§f/${ns}:rollbackhere <time> [radius]`);
   player.sendMessage(`§f/${ns}:restore <id>`);
   player.sendMessage(`§f/${ns}:stats §7· §f/${ns}:export <player> §7· §f${prefix} help`);
-  player.sendMessage(`§f${prefix} dump [n] §7- copy JSON for the hosted website import`);
+  player.sendMessage(`§f${prefix} dump [n] §7- prepare logs for PC file export`);
+  player.sendMessage(`§f${prefix} dumpchat [n] §7- raw JSON in chat (hard to copy)`);
   player.sendMessage("§7Time formats: §f30s§7, §f5m§7, §f2h§7, §f1d§7, §f1w");
 }
 
@@ -199,7 +200,8 @@ function exportLatest(player, name) {
 }
 
 /**
- * Dump recent events as a JSON array for pasting into the hosted dashboard.
+ * Dump recent events. Prefer PC file export — chat copy is painful.
+ * Also re-emits BLJSON lines into Minecraft's content log for tools/pull-minecraft-logs.mjs.
  * @param {Player} player
  * @param {number} [limit]
  */
@@ -207,16 +209,45 @@ function dumpRecent(player, limit = 25) {
   const n = Math.min(Math.max(1, Number(limit) || 25), 50);
   const entries = queryEntries(() => true, { limit: n });
   if (!entries.length) {
+    player.sendMessage("§e[BlockLogger] No events to dump yet. Place/break a few blocks first.");
+    return;
+  }
+
+  // Re-print into content/script log so a PC helper can turn them into real files.
+  for (const entry of entries) {
+    console.warn(`BLJSON:${JSON.stringify(toPublicJson(entry))}`);
+  }
+
+  player.sendMessage(`§a[BlockLogger] §f${entries.length}§a events are ready.`);
+  player.sendMessage(
+    "§eEasiest (PC): §frun §btools\\export-logs.cmd§f — it creates §blogs/blocklogger/latest.json§f"
+  );
+  player.sendMessage(
+    "§7Or: §fnode tools/pull-minecraft-logs.mjs --open"
+  );
+  player.sendMessage(
+    "§7Chat paste (hard): §f!bl dumpchat§7 dumps raw JSON here for the website Import box."
+  );
+}
+
+/**
+ * Raw JSON dump into chat (last resort for website paste).
+ * @param {Player} player
+ * @param {number} [limit]
+ */
+function dumpChat(player, limit = 10) {
+  const n = Math.min(Math.max(1, Number(limit) || 10), 25);
+  const entries = queryEntries(() => true, { limit: n });
+  if (!entries.length) {
     player.sendMessage("§e[BlockLogger] No events to dump yet.");
     return;
   }
   const payload = entries.map((e) => toPublicJson(e));
   player.sendMessage(
-    `§a[BlockLogger] Dump (§f${payload.length}§a). Copy the JSON below into the website Import box:`
+    `§a[BlockLogger] Chat dump (§f${payload.length}§a). Select/copy below into the website Import box:`
   );
-  // Chat has length limits — send in chunks if needed.
   const text = JSON.stringify(payload);
-  const chunkSize = 200;
+  const chunkSize = 180;
   for (let i = 0; i < text.length; i += chunkSize) {
     player.sendMessage(`§f${text.slice(i, i + chunkSize)}`);
   }
@@ -320,6 +351,9 @@ export function handleAction(player, action, parts = []) {
       break;
     case "dump":
       dumpRecent(player, Number(parts[0]) || 25);
+      break;
+    case "dumpchat":
+      dumpChat(player, Number(parts[0]) || 10);
       break;
     default:
       player.sendMessage(`§eUnknown BlockLogger action: ${action}. Try ${CONFIG.chatPrefix} help`);
@@ -539,7 +573,7 @@ export function registerCommands(registry) {
   registry.registerCommand(
     {
       name: `${ns}:dump`,
-      description: "Dump recent events as JSON for the hosted website import",
+      description: "Prepare recent events for PC JSON file export",
       permissionLevel: CommandPermissionLevel.GameDirectors,
       cheatsRequired: false,
       optionalParameters: [{ name: "limit", type: CustomCommandParamType.Integer }],
@@ -551,6 +585,25 @@ export function registerCommands(registry) {
       }
       const args = limit !== undefined ? [String(limit)] : [];
       system.run(() => handleAction(player, "dump", args));
+      return { status: CustomCommandStatus.Success };
+    }
+  );
+
+  registry.registerCommand(
+    {
+      name: `${ns}:dumpchat`,
+      description: "Dump recent events as raw JSON in chat (hard to copy)",
+      permissionLevel: CommandPermissionLevel.GameDirectors,
+      cheatsRequired: false,
+      optionalParameters: [{ name: "limit", type: CustomCommandParamType.Integer }],
+    },
+    (origin, limit) => {
+      const player = getPlayer(origin);
+      if (!player) {
+        return { status: CustomCommandStatus.Failure, message: "Players only." };
+      }
+      const args = limit !== undefined ? [String(limit)] : [];
+      system.run(() => handleAction(player, "dumpchat", args));
       return { status: CustomCommandStatus.Success };
     }
   );
