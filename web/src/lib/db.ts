@@ -11,7 +11,7 @@ type StoredRow = {
   id: number;
   time_ms: number;
   player: string;
-  action: "placed" | "broken";
+  action: "placed" | "broken" | "ignited";
   block: string;
   x: number;
   y: number;
@@ -73,7 +73,7 @@ export async function ensureSchema() {
       id BIGSERIAL PRIMARY KEY,
       time_ms BIGINT NOT NULL,
       player TEXT NOT NULL,
-      action TEXT NOT NULL CHECK (action IN ('placed', 'broken')),
+      action TEXT NOT NULL CHECK (action IN ('placed', 'broken', 'ignited')),
       block TEXT NOT NULL,
       x INTEGER NOT NULL,
       y INTEGER NOT NULL,
@@ -89,9 +89,10 @@ export async function ensureSchema() {
   await sql`CREATE INDEX IF NOT EXISTS idx_logs_coords ON logs(x, y, z)`;
 }
 
-function normalizeAction(raw: unknown): "placed" | "broken" {
+function normalizeAction(raw: unknown): "placed" | "broken" | "ignited" {
   if (raw === "placed" || raw === "p") return "placed";
   if (raw === "broken" || raw === "b" || raw === "broke") return "broken";
+  if (raw === "ignited" || raw === "f" || raw === "fire" || raw === "lit") return "ignited";
   throw new Error(`Invalid action: ${String(raw)}`);
 }
 
@@ -281,6 +282,7 @@ export async function getStats(): Promise<Stats> {
   const players = new Set(rows.map((r) => r.player));
   const placed = rows.filter((r) => r.action === "placed").length;
   const broken = rows.filter((r) => r.action === "broken").length;
+  const ignited = rows.filter((r) => r.action === "ignited").length;
 
   const topMap = new Map<string, number>();
   for (const row of rows) {
@@ -309,6 +311,7 @@ export async function getStats(): Promise<Stats> {
     total: rows.length,
     placed,
     broken,
+    ignited,
     players: players.size,
     topPlayers24h,
     activityByHour,

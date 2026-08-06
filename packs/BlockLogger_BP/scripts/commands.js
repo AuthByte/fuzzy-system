@@ -200,14 +200,17 @@ function exportLatest(player, name) {
 }
 
 /**
- * Dump recent events. Prefer PC file export — chat copy is painful.
+ * Dump events. Prefer PC file export — chat copy is painful.
  * Also re-emits BLJSON lines into Minecraft's content log for tools/pull-minecraft-logs.mjs.
  * @param {Player} player
- * @param {number} [limit]
+ * @param {number} [limit] optional; omit / 0 = all entries
  */
-function dumpRecent(player, limit = 25) {
-  const n = Math.min(Math.max(1, Number(limit) || 25), 50);
-  const entries = queryEntries(() => true, { limit: n });
+function dumpRecent(player, limit) {
+  const raw = Number(limit);
+  const unlimited = limit === undefined || limit === null || limit === "" || raw === 0;
+  const entries = unlimited
+    ? queryEntries(() => true, { unlimited: true })
+    : queryEntries(() => true, { limit: Math.max(1, raw) });
   if (!entries.length) {
     player.sendMessage("§e[BlockLogger] No events to dump yet. Place/break a few blocks first.");
     return;
@@ -218,13 +221,11 @@ function dumpRecent(player, limit = 25) {
     console.warn(`BLJSON:${JSON.stringify(toPublicJson(entry))}`);
   }
 
-  player.sendMessage(`§a[BlockLogger] §f${entries.length}§a events are ready.`);
+  player.sendMessage(`§a[BlockLogger] §f${entries.length}§a events ready (no cap).`);
   player.sendMessage(
-    "§eEasiest (PC): §frun §btools\\export-logs.cmd§f — it creates §blogs/blocklogger/latest.json§f"
+    "§eEasiest (PC): §frun §btools\\export-logs.cmd§f — creates §blogs/blocklogger/latest.json§f"
   );
-  player.sendMessage(
-    "§7Or: §fnode tools/pull-minecraft-logs.mjs --open"
-  );
+  player.sendMessage("§7Or: §fnode tools/pull-minecraft-logs.mjs --open");
   player.sendMessage(
     "§7Chat paste (hard): §f!bl dumpchat§7 dumps raw JSON here for the website Import box."
   );
@@ -233,11 +234,14 @@ function dumpRecent(player, limit = 25) {
 /**
  * Raw JSON dump into chat (last resort for website paste).
  * @param {Player} player
- * @param {number} [limit]
+ * @param {number} [limit] optional; omit / 0 = all entries
  */
-function dumpChat(player, limit = 10) {
-  const n = Math.min(Math.max(1, Number(limit) || 10), 25);
-  const entries = queryEntries(() => true, { limit: n });
+function dumpChat(player, limit) {
+  const raw = Number(limit);
+  const unlimited = limit === undefined || limit === null || limit === "" || raw === 0;
+  const entries = unlimited
+    ? queryEntries(() => true, { unlimited: true })
+    : queryEntries(() => true, { limit: Math.max(1, raw) });
   if (!entries.length) {
     player.sendMessage("§e[BlockLogger] No events to dump yet.");
     return;
@@ -350,10 +354,10 @@ export function handleAction(player, action, parts = []) {
       exportLatest(player, parts[0]);
       break;
     case "dump":
-      dumpRecent(player, Number(parts[0]) || 25);
+      dumpRecent(player, parts[0] !== undefined ? Number(parts[0]) : undefined);
       break;
     case "dumpchat":
-      dumpChat(player, Number(parts[0]) || 10);
+      dumpChat(player, parts[0] !== undefined ? Number(parts[0]) : undefined);
       break;
     default:
       player.sendMessage(`§eUnknown BlockLogger action: ${action}. Try ${CONFIG.chatPrefix} help`);

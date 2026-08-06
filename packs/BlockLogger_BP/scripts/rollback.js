@@ -57,6 +57,24 @@ function applyInverse(entry) {
       }
       return true;
     }
+
+    if (entry.a === "f") {
+      // Extinguish fire / clear ignited fire block. Campfires/TNT left as best-effort.
+      if (
+        block.typeId === "minecraft:fire" ||
+        block.typeId === "minecraft:soul_fire" ||
+        entry.b === "minecraft:fire" ||
+        entry.b === "minecraft:soul_fire"
+      ) {
+        block.setType("minecraft:air");
+        return true;
+      }
+      if (block.typeId.includes("campfire")) {
+        // Can't reliably un-light via stable API in all versions — remove fire overlay only.
+        return false;
+      }
+      return false;
+    }
   } catch (err) {
     console.warn(`[BlockLogger] Failed to apply inverse for #${entry.i}: ${err}`);
   }
@@ -88,6 +106,20 @@ function applyForward(entry) {
     if (entry.a === "b") {
       block.setType("minecraft:air");
       return true;
+    }
+
+    if (entry.a === "f") {
+      const fireId =
+        entry.b === "minecraft:soul_fire" ? "minecraft:soul_fire" : "minecraft:fire";
+      if (
+        entry.b === "minecraft:fire" ||
+        entry.b === "minecraft:soul_fire" ||
+        block.isAir
+      ) {
+        block.setType(fireId);
+        return true;
+      }
+      return false;
     }
   } catch (err) {
     console.warn(`[BlockLogger] Failed to re-apply #${entry.i}: ${err}`);

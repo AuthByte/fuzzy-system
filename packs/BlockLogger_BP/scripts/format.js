@@ -6,12 +6,14 @@
  *   i: number,          // id
  *   t: number,          // unix ms
  *   p: string,          // player name
- *   a: "p"|"b",         // placed | broken
- *   b: string,          // block type id
+ *   a: "p"|"b"|"f",     // placed | broken | fire/ignite
+ *   b: string,          // block type id (or fire/tool target)
  *   x: number, y: number, z: number,
  *   d: string,          // dimension id
  *   s?: object,         // block states (for restore on broken)
- *   r?: number          // rollback batch id (if this entry was rolled back)
+ *   r?: number,         // rollback batch id (if this entry was rolled back)
+ *   c?: number,         // collapsed count (mining bursts)
+ *   tool?: string       // item used (e.g. flint_and_steel)
  * }
  */
 
@@ -20,7 +22,7 @@
  * @property {number} i
  * @property {number} t
  * @property {string} p
- * @property {"p"|"b"} a
+ * @property {"p"|"b"|"f"} a
  * @property {string} b
  * @property {number} x
  * @property {number} y
@@ -28,6 +30,8 @@
  * @property {string} d
  * @property {Record<string, boolean|number|string>=} s
  * @property {number=} r
+ * @property {number=} c
+ * @property {string=} tool
  */
 
 /**
@@ -35,14 +39,18 @@
  * @returns {object}
  */
 export function toPublicJson(entry) {
+  const action =
+    entry.a === "p" ? "placed" : entry.a === "f" ? "ignited" : "broken";
   return {
     id: entry.i,
     time: new Date(entry.t).toISOString(),
     player: entry.p,
-    action: entry.a === "p" ? "placed" : "broken",
+    action,
     block: entry.b,
     location: { x: entry.x, y: entry.y, z: entry.z },
     dimension: entry.d,
+    ...(entry.c && entry.c > 1 ? { count: entry.c } : {}),
+    ...(entry.tool ? { tool: entry.tool } : {}),
     ...(entry.s && Object.keys(entry.s).length ? { states: entry.s } : {}),
     ...(entry.r !== undefined ? { rollbackId: entry.r } : {}),
   };
@@ -55,10 +63,13 @@ export function toPublicJson(entry) {
  * @returns {string}
  */
 export function formatEntryLine(entry, opts = {}) {
-  const action = entry.a === "p" ? "placed" : "broke";
+  const action =
+    entry.a === "p" ? "placed" : entry.a === "f" ? "ignited" : "broke";
+  const count = entry.c && entry.c > 1 ? `§e${entry.c}x ` : "";
   const loc = `${entry.x} ${entry.y} ${entry.z}`;
   const dim = shortDimension(entry.d);
-  let line = `§7#${entry.i} §f${entry.p} §e${action} §b${entry.b} §7@ §f${loc} §8(${dim})`;
+  const tool = entry.tool ? ` §8with §7${entry.tool.replace("minecraft:", "")}` : "";
+  let line = `§7#${entry.i} §f${entry.p} §e${action} ${count}§b${entry.b}${tool} §7@ §f${loc} §8(${dim})`;
   if (opts.includeAge !== false) {
     const ageMs = (opts.now ?? Date.now()) - entry.t;
     line += ` §8· §7${formatShortAge(ageMs)}`;

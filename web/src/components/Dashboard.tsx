@@ -11,6 +11,7 @@ const emptyStats: Stats = {
   total: 0,
   placed: 0,
   broken: 0,
+  ignited: 0,
   players: 0,
   topPlayers24h: [],
   activityByHour: [],
@@ -263,10 +264,14 @@ export default function Dashboard() {
           <span className="stat-label">Placed</span>
           <strong className="stat-value placed">{stats.placed}</strong>
         </article>
-        <article className="stat">
-          <span className="stat-label">Broken</span>
-          <strong className="stat-value broken">{stats.broken}</strong>
-        </article>
+      <article className="stat">
+        <span className="stat-label">Broken</span>
+        <strong className="stat-value broken">{stats.broken}</strong>
+      </article>
+      <article className="stat">
+        <span className="stat-label">Ignited</span>
+        <strong className="stat-value ignited">{stats.ignited ?? 0}</strong>
+      </article>
         <article className="stat">
           <span className="stat-label">Players</span>
           <strong className="stat-value">{stats.players}</strong>
@@ -300,6 +305,7 @@ export default function Dashboard() {
                 <option value="">Any</option>
                 <option value="placed">Placed</option>
                 <option value="broken">Broken</option>
+                <option value="ignited">Ignited</option>
               </select>
             </label>
 

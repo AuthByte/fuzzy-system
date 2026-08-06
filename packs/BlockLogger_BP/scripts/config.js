@@ -59,4 +59,14 @@ export const CONFIG = {
 
   /** Shared secret sent as X-BlockLogger-Key when httpEndpoint is set. */
   httpApiKey: "",
+
+  /**
+   * Items that count as "setting something on fire" when used on a block.
+   */
+  fireTools: ["minecraft:flint_and_steel", "minecraft:fire_charge"],
+
+  /**
+   * Block ids that are fire itself (also caught via place events).
+   */
+  fireBlocks: ["minecraft:fire", "minecraft:soul_fire"],
 };

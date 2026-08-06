@@ -184,7 +184,8 @@ export function invalidateCache() {
  * @returns {LogEntry[]}
  */
 export function queryEntries(predicate, opts = {}) {
-  const limit = opts.limit ?? CONFIG.lookupLimit;
+  const unlimited = opts.limit === 0 || opts.limit === Infinity || opts.unlimited === true;
+  const limit = unlimited ? Infinity : (opts.limit ?? CONFIG.lookupLimit);
   const newestFirst = opts.newestFirst !== false;
   const entries = getAllEntries();
   /** @type {LogEntry[]} */
