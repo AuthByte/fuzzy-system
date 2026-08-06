@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BlockLogger</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="atmosphere" aria-hidden="true"></div>
+
+    <header class="top">
+      <div class="brand-block">
+        <p class="eyebrow">Bedrock survey console</p>
+        <h1 class="brand">BlockLogger</h1>
+        <p class="tagline">
+          Live place &amp; break history — filter by player, time, and coordinates.
+        </p>
+      </div>
+      <div class="top-meta">
+        <div class="pulse" id="livePulse" title="API health"></div>
+        <span id="liveLabel">connecting</span>
+      </div>
+    </header>
+
+    <section class="stats" id="statsRow" aria-label="Summary stats">
+      <article class="stat">
+        <span class="stat-label">Events</span>
+        <strong class="stat-value" id="statTotal">0</strong>
+      </article>
+      <article class="stat">
+        <span class="stat-label">Placed</span>
+        <strong class="stat-value placed" id="statPlaced">0</strong>
+      </article>
+      <article class="stat">
+        <span class="stat-label">Broken</span>
+        <strong class="stat-value broken" id="statBroken">0</strong>
+      </article>
+      <article class="stat">
+        <span class="stat-label">Players</span>
+        <strong class="stat-value" id="statPlayers">0</strong>
+      </article>
+    </section>
+
+    <section class="workspace">
+      <aside class="filters" aria-label="Filters">
+        <form id="filterForm">
+          <label>
+            Player
+            <input list="playerList" name="player" id="player" placeholder="Finn" autocomplete="off" />
+          </label>
+          <datalist id="playerList"></datalist>
+
+          <label>
+            Action
+            <select name="action" id="action">
+              <option value="">Any</option>
+              <option value="placed">Placed</option>
+              <option value="broken">Broken</option>
+            </select>
+          </label>
+
+          <label>
+            Dimension
+            <select name="dimension" id="dimension">
+              <option value="">Any</option>
+              <option value="minecraft:overworld">Overworld</option>
+              <option value="minecraft:nether">Nether</option>
+              <option value="minecraft:the_end">The End</option>
+            </select>
+          </label>
+
+          <label>
+            Block contains
+            <input name="block" id="block" placeholder="diamond" />
+          </label>
+
+          <fieldset class="time-field">
+            <legend>Time range</legend>
+            <label>
+              From
+              <input type="datetime-local" name="fromLocal" id="fromLocal" />
+            </label>
+            <label>
+              To
+              <input type="datetime-local" name="toLocal" id="toLocal" />
+            </label>
+            <div class="quick-times">
+              <button type="button" data-hours="1">1h</button>
+              <button type="button" data-hours="6">6h</button>
+              <button type="button" data-hours="24">24h</button>
+              <button type="button" data-hours="168">7d</button>
+            </div>
+          </fieldset>
+
+          <fieldset class="coord-field">
+            <legend>Coordinates</legend>
+            <div class="coord-grid">
+              <label>X <input type="number" name="x" id="x" /></label>
+              <label>Y <input type="number" name="y" id="y" /></label>
+              <label>Z <input type="number" name="z" id="z" /></label>
+            </div>
+            <label>
+              Radius
+              <input type="number" name="radius" id="radius" min="0" value="8" />
+            </label>
+          </fieldset>
+
+          <div class="filter-actions">
+            <button type="submit" class="primary">Apply filters</button>
+            <button type="button" id="resetBtn" class="ghost">Reset</button>
+          </div>
+        </form>
+
+        <div class="activity" aria-label="24h activity">
+          <h2>Last 24h</h2>
+          <div class="bars" id="activityBars"></div>
+          <h3>Top players</h3>
+          <ul class="top-players" id="topPlayers"></ul>
+        </div>
+      </aside>
+
+      <main class="results">
+        <div class="results-head">
+          <h2>Event stream</h2>
+          <p id="resultMeta">Loading…</p>
+        </div>
+
+        <div class="map-panel" aria-label="Coordinate scatter">
+          <canvas id="scatter" width="900" height="280"></canvas>
+          <p class="map-caption">XZ scatter of the current result set</p>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Player</th>
+                <th>Action</th>
+                <th>Block</th>
+                <th>Coords</th>
+                <th>Dim</th>
+              </tr>
+            </thead>
+            <tbody id="logBody"></tbody>
+          </table>
+        </div>
+
+        <div class="pager">
+          <button type="button" id="prevPage" class="ghost">Newer</button>
+          <button type="button" id="nextPage" class="ghost">Older</button>
+        </div>
+      </main>
+    </section>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

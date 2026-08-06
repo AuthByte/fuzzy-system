@@ -1,0 +1,19 @@
+.DS_Store
+*.mcpack
+*.mcaddon
+*.zip
+node_modules/
+.idea/
+.vscode/
+dashboard/data/
+web/.env*.local
+web/.vercel
+*.sqlite
+*.sqlite-*
+.next/
+dist/
+
+# Ship the installable pack
+!releases/
+!releases/*.mcpack
+web/data/
