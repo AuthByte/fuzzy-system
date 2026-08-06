@@ -479,6 +479,132 @@ function onEntityDie(event) {
 }
 
 /**
+ * @param {import("@minecraft/server").Entity | undefined} entity
+ * @returns {string | undefined}
+ */
+function heldItemId(entity) {
+  if (!entity) return undefined;
+  try {
+    const eq = entity.getComponent?.("minecraft:equippable");
+    const stack = eq?.getEquipment?.("Mainhand");
+    return stack?.typeId;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * @param {import("@minecraft/server").EntityDamageSource | undefined} damageSource
+ * @returns {import("@minecraft/server").Entity | undefined}
+ */
+function resolveAttacker(damageSource) {
+  if (!damageSource) return undefined;
+  if (damageSource.damagingEntity) return damageSource.damagingEntity;
+  const proj = damageSource.damagingProjectile;
+  if (!proj) return undefined;
+  try {
+    // @ts-ignore
+    const owner = proj.getComponent?.("minecraft:projectile")?.owner;
+    if (owner) return owner;
+  } catch {
+    // ignore
+  }
+  return proj;
+}
+
+/**
+ * @param {import("@minecraft/server").Entity} attacker
+ * @param {import("@minecraft/server").Entity} victim
+ * @param {string} cause
+ * @param {number | undefined} damage
+ */
+function logCombatHit(attacker, victim, cause, damage) {
+  if (!CONFIG.logHits || !attacker || !victim) return;
+
+  const attackerIsPlayer = attacker.typeId === "minecraft:player";
+  const victimIsPlayer = victim.typeId === "minecraft:player";
+  if (CONFIG.logHitsPlayersOnly && !attackerIsPlayer && !victimIsPlayer) {
+    return;
+  }
+
+  const loc = victim.location ?? attacker.location;
+  if (!loc) return;
+
+  let dimId = "minecraft:overworld";
+  try {
+    dimId = victim.dimension?.id ?? attacker.dimension?.id ?? dimId;
+  } catch {
+    // ignore
+  }
+
+  const actor = attackerIsPlayer
+    ? attacker.name ?? attacker.nameTag ?? "Unknown"
+    : actorLabel(attacker);
+
+  const victimLabel = victimIsPlayer
+    ? `player:${victim.name ?? victim.nameTag ?? "Unknown"}`
+    : victim.typeId;
+
+  const held = heldItemId(attacker);
+  const toolParts = [cause];
+  if (held) toolParts.push(held);
+  if (typeof damage === "number" && Number.isFinite(damage)) {
+    toolParts.push(`${Math.round(damage * 10) / 10}hp`);
+  }
+
+  commit({
+    t: nowMs(),
+    p: String(actor),
+    a: "h",
+    b: victimLabel,
+    x: Math.floor(loc.x),
+    y: Math.floor(loc.y),
+    z: Math.floor(loc.z),
+    d: dimId,
+    tool: toolParts.join("/"),
+  });
+}
+
+/**
+ * Melee hit (entity punches entity).
+ * @param {import("@minecraft/server").EntityHitEntityAfterEvent} event
+ */
+function onEntityHitEntity(event) {
+  try {
+    logCombatHit(event.damagingEntity, event.hitEntity, "melee", undefined);
+  } catch (err) {
+    console.warn(`[BlockLogger] hit log failed: ${err}`);
+  }
+}
+
+/**
+ * Non-melee combat damage (arrows, tridents, throrns-style entity sources, …).
+ * Melee is already covered by entityHitEntity — skip entityAttack to avoid doubles.
+ * @param {import("@minecraft/server").EntityHurtAfterEvent} event
+ */
+function onEntityHurt(event) {
+  if (!CONFIG.logHits) return;
+  try {
+    const cause = String(event.damageSource?.cause ?? "unknown");
+    // Bedrock cause strings vary slightly by version.
+    if (
+      cause === "entityAttack" ||
+      cause === "entity_attack" ||
+      cause === "EntityAttack"
+    ) {
+      return;
+    }
+
+    const attacker = resolveAttacker(event.damageSource);
+    if (!attacker) return; // environmental damage (fall, fire, drown, …)
+
+    logCombatHit(attacker, event.hurtEntity, cause, event.damage);
+  } catch (err) {
+    console.warn(`[BlockLogger] hurt-hit log failed: ${err}`);
+  }
+}
+
+/**
  * Fire charge projectile hitting a block.
  * @param {import("@minecraft/server").ProjectileHitBlockAfterEvent} event
  */
@@ -610,5 +736,21 @@ export function registerLoggerEvents() {
     after.entityDie.subscribe(onEntityDie);
   } else {
     console.warn("[BlockLogger] entityDie unavailable; kill logging disabled.");
+  }
+
+  if (after.entityHitEntity) {
+    after.entityHitEntity.subscribe(onEntityHitEntity);
+  } else {
+    console.warn(
+      "[BlockLogger] entityHitEntity unavailable; melee hit logging disabled."
+    );
+  }
+
+  if (after.entityHurt) {
+    after.entityHurt.subscribe(onEntityHurt);
+  } else {
+    console.warn(
+      "[BlockLogger] entityHurt unavailable; projectile hit logging limited."
+    );
   }
 }

@@ -4,7 +4,8 @@ export type LogAction =
   | "ignited"
   | "exploded"
   | "opened"
-  | "killed";
+  | "killed"
+  | "hit";
 
 export type LogEvent = {
   id?: number | string;
@@ -49,6 +50,7 @@ export type Stats = {
   exploded: number;
   opened: number;
   killed: number;
+  hit: number;
   players: number;
   topPlayers24h: { player: string; c: number }[];
   activityByHour: { hour: string; count: number }[];

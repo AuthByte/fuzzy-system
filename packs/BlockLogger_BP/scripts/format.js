@@ -6,7 +6,7 @@
  *   i: number,          // id
  *   t: number,          // unix ms
  *   p: string,          // player / actor name
- *   a: "p"|"b"|"f"|"e"|"o"|"k",  // placed|broken|ignited|exploded|opened|killed
+ *   a: "p"|"b"|"f"|"e"|"o"|"k"|"h", // placed|broken|ignited|exploded|opened|killed|hit
  *   b: string,          // block / entity type id
  *   x: number, y: number, z: number,
  *   d: string,          // dimension id
@@ -22,7 +22,7 @@
  * @property {number} i
  * @property {number} t
  * @property {string} p
- * @property {"p"|"b"|"f"|"e"|"o"|"k"} a
+ * @property {"p"|"b"|"f"|"e"|"o"|"k"|"h"} a
  * @property {string} b
  * @property {number} x
  * @property {number} y
@@ -42,6 +42,7 @@ const ACTION_PUBLIC = {
   e: "exploded",
   o: "opened",
   k: "killed",
+  h: "hit",
 };
 
 /** @type {Record<string, string>} */
@@ -52,6 +53,7 @@ const ACTION_CHAT = {
   e: "exploded",
   o: "opened",
   k: "killed",
+  h: "hit",
 };
 
 /**

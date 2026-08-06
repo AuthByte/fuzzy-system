@@ -150,4 +150,16 @@ export const CONFIG = {
     "minecraft:ender_chest",
     "shulker_box",
   ],
+
+  /**
+   * Log combat hits (melee + projectiles / other entity-sourced damage).
+   * Very chatty on busy realms — keep playersOnly true unless you need mob-vs-mob.
+   */
+  logHits: true,
+
+  /**
+   * When true, only log hits where a player is the attacker or the victim.
+   * Set false to log every entity-vs-entity hit (mob farms will flood storage).
+   */
+  logHitsPlayersOnly: true,
 };

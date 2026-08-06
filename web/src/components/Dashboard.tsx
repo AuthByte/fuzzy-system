@@ -15,6 +15,7 @@ const emptyStats: Stats = {
   exploded: 0,
   opened: 0,
   killed: 0,
+  hit: 0,
   players: 0,
   topPlayers24h: [],
   activityByHour: [],
@@ -203,7 +204,9 @@ export default function Dashboard() {
                 ? "#38bdf8"
                 : item.action === "killed"
                   ? "#f472b6"
-                  : "#fb923c";
+                  : item.action === "hit"
+                    ? "#a3e635"
+                    : "#fb923c";
       ctx.globalAlpha = 0.85;
       ctx.arc(px, py, 3.2, 0, Math.PI * 2);
       ctx.fill();
@@ -299,6 +302,10 @@ export default function Dashboard() {
           <strong className="stat-value killed">{stats.killed ?? 0}</strong>
         </article>
         <article className="stat">
+          <span className="stat-label">Hits</span>
+          <strong className="stat-value hit">{stats.hit ?? 0}</strong>
+        </article>
+        <article className="stat">
           <span className="stat-label">Players</span>
           <strong className="stat-value">{stats.players}</strong>
         </article>
@@ -335,6 +342,7 @@ export default function Dashboard() {
                 <option value="exploded">Exploded</option>
                 <option value="opened">Opened</option>
                 <option value="killed">Killed</option>
+                <option value="hit">Hit</option>
               </select>
             </label>
 
