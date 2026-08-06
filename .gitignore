@@ -6,5 +6,8 @@ node_modules/
 .idea/
 .vscode/
 dashboard/data/
+web/.env*.local
+web/.vercel
 *.sqlite
 *.sqlite-*
+.next/

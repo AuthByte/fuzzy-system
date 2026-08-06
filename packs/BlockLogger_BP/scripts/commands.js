@@ -180,6 +180,7 @@ function showHelp(player) {
   player.sendMessage(`§f/${ns}:rollbackhere <time> [radius]`);
   player.sendMessage(`§f/${ns}:restore <id>`);
   player.sendMessage(`§f/${ns}:stats §7· §f/${ns}:export <player> §7· §f${prefix} help`);
+  player.sendMessage(`§f${prefix} dump [n] §7- copy JSON for the hosted website import`);
   player.sendMessage("§7Time formats: §f30s§7, §f5m§7, §f2h§7, §f1d§7, §f1w");
 }
 
@@ -195,6 +196,30 @@ function exportLatest(player, name) {
     return;
   }
   player.sendMessage(`§a[BlockLogger] JSON:\n§f${JSON.stringify(toPublicJson(entries[0]))}`);
+}
+
+/**
+ * Dump recent events as a JSON array for pasting into the hosted dashboard.
+ * @param {Player} player
+ * @param {number} [limit]
+ */
+function dumpRecent(player, limit = 25) {
+  const n = Math.min(Math.max(1, Number(limit) || 25), 50);
+  const entries = queryEntries(() => true, { limit: n });
+  if (!entries.length) {
+    player.sendMessage("§e[BlockLogger] No events to dump yet.");
+    return;
+  }
+  const payload = entries.map((e) => toPublicJson(e));
+  player.sendMessage(
+    `§a[BlockLogger] Dump (§f${payload.length}§a). Copy the JSON below into the website Import box:`
+  );
+  // Chat has length limits — send in chunks if needed.
+  const text = JSON.stringify(payload);
+  const chunkSize = 200;
+  for (let i = 0; i < text.length; i += chunkSize) {
+    player.sendMessage(`§f${text.slice(i, i + chunkSize)}`);
+  }
 }
 
 /**
@@ -292,6 +317,9 @@ export function handleAction(player, action, parts = []) {
         break;
       }
       exportLatest(player, parts[0]);
+      break;
+    case "dump":
+      dumpRecent(player, Number(parts[0]) || 25);
       break;
     default:
       player.sendMessage(`§eUnknown BlockLogger action: ${action}. Try ${CONFIG.chatPrefix} help`);
@@ -504,6 +532,25 @@ export function registerCommands(registry) {
         return { status: CustomCommandStatus.Failure, message: "Players only." };
       }
       system.run(() => handleAction(player, "export", [playerName]));
+      return { status: CustomCommandStatus.Success };
+    }
+  );
+
+  registry.registerCommand(
+    {
+      name: `${ns}:dump`,
+      description: "Dump recent events as JSON for the hosted website import",
+      permissionLevel: CommandPermissionLevel.GameDirectors,
+      cheatsRequired: false,
+      optionalParameters: [{ name: "limit", type: CustomCommandParamType.Integer }],
+    },
+    (origin, limit) => {
+      const player = getPlayer(origin);
+      if (!player) {
+        return { status: CustomCommandStatus.Failure, message: "Players only." };
+      }
+      const args = limit !== undefined ? [String(limit)] : [];
+      system.run(() => handleAction(player, "dump", args));
       return { status: CustomCommandStatus.Success };
     }
   );

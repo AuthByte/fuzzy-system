@@ -1,135 +1,92 @@
 # BlockLogger — Minecraft Bedrock Block Logging Add-on
 
-CoreProtect-style logging for **Minecraft Bedrock Edition**. Records every player block place and break with player name, block type, action, coordinates, dimension, and timestamp. Supports in-game lookup/rollback **and** an optional web dashboard for Bedrock Dedicated Server.
+CoreProtect-style logging for **Minecraft Bedrock Edition**, with an optional **hosted website** (Vercel) for rich filters and visuals.
+
+## Honest answer about “just the addon”
+
+| What you want | Possible? |
+|---|---|
+| Host the website on Vercel (no PC server for viewing) | **Yes** |
+| Add the pack to a normal world / Realms and have it auto-upload | **No** — Bedrock Script API cannot call the internet there |
+| Sync to the website from a normal world | **Yes** — run `!bl dump` in game, paste into the site Import box |
+| Auto-upload continuously | Needs **Bedrock Dedicated Server** + log bridge (or networking APIs) |
+
+So: the **website runs on Vercel**. The **addon still logs in your world**. You push events to the site with dump/paste (easy) or a BDS bridge (automatic).
 
 ## No experiments required
 
-This pack uses the **stable** `@minecraft/server` Script API only.
-
-- **Do not** enable Beta APIs / Experiments
-- Works on **existing worlds** — just activate the behavior pack
-- The website path uses a **log bridge** (no `@minecraft/server-net`, no Beta APIs)
-
-## What gets logged
-
-```json
-{
-  "time": "2026-08-05T19:24:31.000Z",
-  "player": "Finn",
-  "action": "placed",
-  "block": "minecraft:diamond_block",
-  "location": { "x": 152, "y": 67, "z": -421 },
-  "dimension": "minecraft:overworld"
-}
-```
+Stable `@minecraft/server` only. Do **not** enable Beta APIs. Works on existing worlds.
 
 ## Install the behavior pack
 
-1. Copy `packs/BlockLogger_BP` into the world’s `behavior_packs` folder  
-   **or** import `BlockLogger_BP.mcpack` (`python3 tools/package.py`).
-2. Edit world → **Behavior Packs** → activate **BlockLogger**.
-3. Load the world. Chat will confirm logging is on.
+1. Use `packs/BlockLogger_BP` (or `python3 tools/package.py` → `.mcpack`)
+2. Activate it on your world
+3. In chat: `!bl help`
 
-### In-game commands
+### Useful commands
 
 ```
-!bl help
 !bl inspect
 !bl lookup Finn
 !bl near 16
+!bl dump 25          # copy JSON → paste on the website
 !bl rollback Finn 1h
-!bl stats
 ```
 
-Slash forms also exist: `/blocklogger:inspect`, `/blocklogger:lookup`, etc.
+## Host the website on Vercel
 
-## Web dashboard (BDS)
+The app lives in `web/` (Next.js).
 
-Rich UI with player / time / coordinate filters, activity chart, and XZ scatter map.
+1. Import this GitHub repo in [Vercel](https://vercel.com/new)
+2. Set **Root Directory** to `web`
+3. Add storage (Vercel dashboard → Storage):
+   - **Neon** Postgres (sets `DATABASE_URL`) — preferred, or
+   - **Blob** (sets `BLOB_READ_WRITE_TOKEN`)
+4. Optional env: `BLOCKLOGGER_API_KEY` (protects imports/POSTs)
+5. Deploy → open `https://your-project.vercel.app`
 
-### 1. Start the dashboard
+Local preview:
 
 ```bash
-cd dashboard
+cd web
 npm install
-npm start
-# → http://127.0.0.1:8787
+npm run dev
 ```
 
-Optional:
+### Syncing logs to the hosted site
+
+**Normal world / Realms**
+
+1. Play with the pack on
+2. `!bl dump`
+3. Open your Vercel URL → **Import from game** → paste → Import
+
+**Bedrock Dedicated Server (auto)**
 
 ```bash
-export BLOCKLOGGER_API_KEY='your-secret'
-npm run seed      # sample events
-npm run test:api  # smoke test
-```
-
-### 2. Enable bridge output in the pack
-
-In `packs/BlockLogger_BP/scripts/config.js`:
-
-```js
-bridgeConsole: true,  // already default on
-```
-
-Each event prints a line like `BLJSON:{...}` to the BDS console/content log.
-
-### 3. Pipe BDS logs into the bridge
-
-```bash
-# terminal A
-cd dashboard && npm start
-
-# terminal B — pipe server output (example)
+# point bridge at your Vercel deployment
+export BLOCKLOGGER_URL='https://your-project.vercel.app/api/logs'
+export BLOCKLOGGER_API_KEY='optional-secret'
 ./bedrock_server 2>&1 | node tools/bds-bridge.mjs
-
-# or tail an existing log file
-tail -F logs/latest.log | node tools/bds-bridge.mjs
 ```
 
-Bridge env vars:
-
-| Variable | Default |
-|---|---|
-| `BLOCKLOGGER_URL` | `http://127.0.0.1:8787/api/logs` |
-| `BLOCKLOGGER_API_KEY` | _(empty)_ |
-
-Open **http://127.0.0.1:8787** and filter by player, time range, block name, or XYZ + radius.
-
-### API
-
-- `GET /api/health`
-- `GET /api/stats`
-- `GET /api/players`
-- `GET /api/logs?player=&action=&dimension=&block=&from=&to=&x=&y=&z=&radius=&limit=&offset=`
-- `POST /api/logs` — single object or array (header `X-BlockLogger-Key` if keyed)
-- `POST /block-log` — same as POST `/api/logs`
+Pack setting `bridgeConsole: true` (default) emits `BLJSON:` lines for the bridge.
 
 ## Where logs live
 
-| Path | Storage |
+| Place | Storage |
 |---|---|
-| In-game (always) | World dynamic properties (soft cap ~8000) |
-| Dashboard | SQLite file at `dashboard/data/blocklogger.sqlite` |
-
-## Configuration (`scripts/config.js`)
-
-- `chatPrefix` — default `!bl`
-- `bridgeConsole` — emit `BLJSON:` for the BDS bridge
-- `httpEndpoint` / `httpApiKey` — optional direct POST if your runtime has `fetch`
-- `maxEntries`, `lookupLimit`, `maxRollbackBlocks`
-
-## Limitations
-
-Not fully attributed with the standard API alone: explosions without a player source, fluid flow, pistons, natural generation/decay.
+| In Minecraft | World dynamic properties (always) |
+| Website | Neon Postgres or Vercel Blob |
 
 ## Project layout
 
 ```
 packs/BlockLogger_BP/   # Bedrock behavior pack
-dashboard/              # Web API + visual UI
-tools/bds-bridge.mjs    # BDS log → HTTP bridge
-tools/package.py        # builds .mcpack
+web/                    # Next.js site for Vercel
+dashboard/              # Older local Express+SQLite demo (optional)
+tools/bds-bridge.mjs    # BDS → website bridge
+tools/package.py
 ```
 
 ## License
