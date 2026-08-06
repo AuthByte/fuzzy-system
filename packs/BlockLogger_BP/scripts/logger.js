@@ -9,6 +9,9 @@ import { nowMs } from "./time.js";
  * @typedef {import("@minecraft/server").Block} Block
  */
 
+/** @type {Map<string, number>} player:x,y,z → expire tick (dedupe bucket + place) */
+const recentLiquidLogs = new Map();
+
 /**
  * @param {Omit<LogEntry, "i">} partial
  * @returns {LogEntry}
@@ -17,6 +20,61 @@ function commit(partial) {
   const entry = appendEntry(partial);
   exportEntry(entry);
   return entry;
+}
+
+/**
+ * @param {string} playerName
+ * @param {number} x
+ * @param {number} y
+ * @param {number} z
+ */
+function markLiquidLogged(playerName, x, y, z) {
+  const key = `${playerName}:${x},${y},${z}`;
+  recentLiquidLogs.set(key, system.currentTick + 3);
+  // Opportunistic cleanup
+  if (recentLiquidLogs.size > 200) {
+    const tick = system.currentTick;
+    for (const [k, exp] of recentLiquidLogs) {
+      if (exp < tick) recentLiquidLogs.delete(k);
+    }
+  }
+}
+
+/**
+ * @param {string} playerName
+ * @param {number} x
+ * @param {number} y
+ * @param {number} z
+ * @returns {boolean}
+ */
+function wasRecentlyLiquidLogged(playerName, x, y, z) {
+  const key = `${playerName}:${x},${y},${z}`;
+  const exp = recentLiquidLogs.get(key);
+  if (exp === undefined) return false;
+  if (system.currentTick > exp) {
+    recentLiquidLogs.delete(key);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * @param {string} typeId
+ * @returns {boolean}
+ */
+function isLiquidBlock(typeId) {
+  return CONFIG.liquidBlocks.includes(typeId);
+}
+
+/**
+ * Normalize flowing_* to the source id we store in logs.
+ * @param {string} typeId
+ * @returns {string}
+ */
+function normalizeLiquidId(typeId) {
+  if (typeId === "minecraft:flowing_water") return "minecraft:water";
+  if (typeId === "minecraft:flowing_lava") return "minecraft:lava";
+  return typeId;
 }
 
 /**
@@ -44,11 +102,23 @@ export function onPlayerPlaceBlock(event) {
     return;
   }
 
+  // Bucket pours are logged via interact; skip duplicate place events.
+  if (
+    isLiquidBlock(block.typeId) &&
+    wasRecentlyLiquidLogged(player.name, block.x, block.y, block.z)
+  ) {
+    return;
+  }
+
+  if (isLiquidBlock(block.typeId)) {
+    markLiquidLogged(player.name, block.x, block.y, block.z);
+  }
+
   commit({
     t: nowMs(),
     p: player.name,
     a: "p",
-    b: block.typeId,
+    b: normalizeLiquidId(block.typeId),
     x: block.x,
     y: block.y,
     z: block.z,
@@ -74,7 +144,7 @@ export function onPlayerBreakBlock(event) {
     t: nowMs(),
     p: player.name,
     a: "b",
-    b: blockId,
+    b: normalizeLiquidId(blockId),
     x: block.x,
     y: block.y,
     z: block.z,
@@ -104,19 +174,117 @@ function blockOnFace(block, face) {
 }
 
 /**
- * Flint & steel / fire charge used on a block.
+ * Prefer the cell that now holds the fluid; fall back to the face cell / click.
+ * @param {Block} clicked
+ * @param {string | Direction} face
+ * @param {string} expectedFluid
+ * @returns {{ target: Block, blockName: string }}
+ */
+function resolveFluidTarget(clicked, face, expectedFluid) {
+  const adjacent = blockOnFace(clicked, face);
+  if (adjacent && isLiquidBlock(adjacent.typeId)) {
+    return {
+      target: adjacent,
+      blockName: normalizeLiquidId(adjacent.typeId),
+    };
+  }
+  if (isLiquidBlock(clicked.typeId)) {
+    return {
+      target: clicked,
+      blockName: normalizeLiquidId(clicked.typeId),
+    };
+  }
+  // Cauldron fill / placement rejected / creative edge cases — still log intent.
+  if (adjacent) {
+    return { target: adjacent, blockName: expectedFluid };
+  }
+  return { target: clicked, blockName: expectedFluid };
+}
+
+/**
+ * Flint & steel / fire charge / water & lava buckets used on a block.
  * @param {import("@minecraft/server").PlayerInteractWithBlockAfterEvent} event
  */
 function onPlayerInteractWithBlock(event) {
   if (event.isFirstEvent === false) return;
 
-  const toolId =
+  const beforeId =
     event.beforeItemStack?.typeId ?? event.itemStack?.typeId ?? "";
-  if (!CONFIG.fireTools.includes(toolId)) return;
+  const afterId = event.itemStack?.typeId ?? "";
 
   const player = event.player;
   const clicked = event.block;
   if (!player || !clicked) return;
+
+  // --- Liquid place (water / lava / powder snow bucket) ---
+  const placeFluid = CONFIG.liquidPlaceBuckets[beforeId];
+  if (placeFluid) {
+    // Interact succeeded with a full bucket — pour (survival empties; creative may keep it).
+    system.run(() => {
+      try {
+        const { target, blockName } = resolveFluidTarget(
+          clicked,
+          event.blockFace,
+          placeFluid
+        );
+        if (wasRecentlyLiquidLogged(player.name, target.x, target.y, target.z)) {
+          return;
+        }
+        markLiquidLogged(player.name, target.x, target.y, target.z);
+        commit({
+          t: nowMs(),
+          p: player.name,
+          a: "p",
+          b: blockName,
+          x: target.x,
+          y: target.y,
+          z: target.z,
+          d: target.dimension.id,
+          s: snapshotStates(target.permutation),
+          tool: beforeId,
+        });
+      } catch (err) {
+        console.warn(`[BlockLogger] liquid place log failed: ${err}`);
+      }
+    });
+    return;
+  }
+
+  // --- Liquid pickup (empty bucket → water/lava/powder snow bucket) ---
+  if (beforeId === "minecraft:bucket") {
+    const pickedFluid = CONFIG.liquidPickupResults[afterId];
+    if (pickedFluid) {
+      system.run(() => {
+        try {
+          // Source is usually the clicked block (water/lava/cauldron).
+          const target = isLiquidBlock(clicked.typeId)
+            ? clicked
+            : blockOnFace(clicked, event.blockFace) ?? clicked;
+          if (wasRecentlyLiquidLogged(player.name, target.x, target.y, target.z)) {
+            return;
+          }
+          markLiquidLogged(player.name, target.x, target.y, target.z);
+          commit({
+            t: nowMs(),
+            p: player.name,
+            a: "b",
+            b: pickedFluid,
+            x: target.x,
+            y: target.y,
+            z: target.z,
+            d: target.dimension.id,
+            tool: "minecraft:bucket",
+          });
+        } catch (err) {
+          console.warn(`[BlockLogger] liquid pickup log failed: ${err}`);
+        }
+      });
+      return;
+    }
+  }
+
+  // --- Fire tools ---
+  if (!CONFIG.fireTools.includes(beforeId)) return;
 
   // Defer one tick so fire/campfire/TNT state can update.
   system.run(() => {
@@ -163,7 +331,7 @@ function onPlayerInteractWithBlock(event) {
         z: target.z,
         d: target.dimension.id,
         s: snapshotStates(target.permutation),
-        tool: toolId,
+        tool: beforeId,
       });
     } catch (err) {
       console.warn(`[BlockLogger] fire log failed: ${err}`);
@@ -265,7 +433,7 @@ function maybeHttp(pub) {
 }
 
 /**
- * Subscribe to place/break/fire events.
+ * Subscribe to place/break/fire/liquid events.
  */
 export function registerLoggerEvents() {
   world.afterEvents.playerBreakBlock.subscribe(onPlayerBreakBlock);
@@ -283,7 +451,7 @@ export function registerLoggerEvents() {
     after.playerInteractWithBlock.subscribe(onPlayerInteractWithBlock);
   } else {
     console.warn(
-      "[BlockLogger] playerInteractWithBlock unavailable; flint/steel fire logging limited."
+      "[BlockLogger] playerInteractWithBlock unavailable; bucket/fire logging limited."
     );
   }
 

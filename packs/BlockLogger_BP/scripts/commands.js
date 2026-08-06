@@ -182,6 +182,7 @@ function showHelp(player) {
   player.sendMessage(`§f/${ns}:stats §7· §f/${ns}:export <player> §7· §f${prefix} help`);
   player.sendMessage(`§f${prefix} dump [n] §7- prepare logs for PC file export`);
   player.sendMessage(`§f${prefix} dumpchat [n] §7- raw JSON in chat (hard to copy)`);
+  player.sendMessage("§7Logs place/break, fire, water & lava buckets.");
   player.sendMessage("§7Time formats: §f30s§7, §f5m§7, §f2h§7, §f1d§7, §f1w");
 }
 

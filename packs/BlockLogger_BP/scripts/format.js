@@ -7,13 +7,13 @@
  *   t: number,          // unix ms
  *   p: string,          // player name
  *   a: "p"|"b"|"f",     // placed | broken | fire/ignite
- *   b: string,          // block type id (or fire/tool target)
+ *   b: string,          // block type id (water/lava/fire/etc.)
  *   x: number, y: number, z: number,
  *   d: string,          // dimension id
  *   s?: object,         // block states (for restore on broken)
  *   r?: number,         // rollback batch id (if this entry was rolled back)
  *   c?: number,         // collapsed count (mining bursts)
- *   tool?: string       // item used (e.g. flint_and_steel)
+ *   tool?: string       // item used (flint_and_steel, water_bucket, …)
  * }
  */
 
