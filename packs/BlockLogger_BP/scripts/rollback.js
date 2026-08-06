@@ -58,8 +58,8 @@ function applyInverse(entry) {
       return true;
     }
 
-    if (entry.a === "o" || entry.a === "k") {
-      // Opens / kills have no block inverse.
+    if (entry.a === "o" || entry.a === "k" || entry.a === "h") {
+      // Opens / kills / hits have no block inverse.
       return false;
     }
 
@@ -113,7 +113,7 @@ function applyForward(entry) {
       return true;
     }
 
-    if (entry.a === "o" || entry.a === "k") {
+    if (entry.a === "o" || entry.a === "k" || entry.a === "h") {
       return false;
     }
 

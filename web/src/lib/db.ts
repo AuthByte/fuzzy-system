@@ -102,6 +102,7 @@ function normalizeAction(raw: unknown): import("./types").LogAction {
   if (raw === "exploded" || raw === "e" || raw === "explode") return "exploded";
   if (raw === "opened" || raw === "o" || raw === "open") return "opened";
   if (raw === "killed" || raw === "k" || raw === "kill" || raw === "death") return "killed";
+  if (raw === "hit" || raw === "h" || raw === "hits" || raw === "attack") return "hit";
   throw new Error(`Invalid action: ${String(raw)}`);
 }
 
@@ -295,6 +296,7 @@ export async function getStats(): Promise<Stats> {
   const exploded = rows.filter((r) => r.action === "exploded").length;
   const opened = rows.filter((r) => r.action === "opened").length;
   const killed = rows.filter((r) => r.action === "killed").length;
+  const hit = rows.filter((r) => r.action === "hit").length;
 
   const topMap = new Map<string, number>();
   for (const row of rows) {
@@ -327,6 +329,7 @@ export async function getStats(): Promise<Stats> {
     exploded,
     opened,
     killed,
+    hit,
     players: players.size,
     topPlayers24h,
     activityByHour,

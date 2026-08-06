@@ -209,6 +209,9 @@ code {
 .stat-value.killed {
   color: #f472b6;
 }
+.stat-value.hit {
+  color: #a3e635;
+}
 
 .workspace {
   display: grid;
@@ -546,6 +549,12 @@ tbody tr:hover {
   color: #f472b6;
   background: rgba(244, 114, 182, 0.1);
   border-color: rgba(244, 114, 182, 0.28);
+}
+
+.action-pill.hit {
+  color: #a3e635;
+  background: rgba(163, 230, 53, 0.1);
+  border-color: rgba(163, 230, 53, 0.28);
 }
 
 .mono {
