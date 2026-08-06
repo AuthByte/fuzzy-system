@@ -23,7 +23,7 @@ Stable `@minecraft/server` only. Do **not** enable Beta APIs. Works on existing 
 2. Activate it on your world
 3. In chat: `!bl help`
 
-Logs **block place/break**, **fire**, **water / lava** buckets, **explosions**, **chest opens**, **kills**, and **combat hits** (melee + arrows; player-involved by default).
+Logs **block place/break**, **fire**, **liquids**, **explosions**, **chest opens**, **kills**, **hits**, plus **item pickup/drop** and **chest took/put** (open→close inventory diff for theft checks).
 
 ### Useful commands
 

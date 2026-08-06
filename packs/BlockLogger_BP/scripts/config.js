@@ -162,4 +162,22 @@ export const CONFIG = {
    * Set false to log every entity-vs-entity hit (mob farms will flood storage).
    */
   logHitsPlayersOnly: true,
+
+  /** Log players picking items up from the ground. */
+  logItemPickup: true,
+
+  /** Log players dropping items onto the ground. */
+  logItemDrop: true,
+
+  /**
+   * Diff chest/barrel/shulker contents between open and close to log
+   * took (removed) and put (deposited) item stacks — theft detection.
+   */
+  logContainerItems: true,
+
+  /** Fallback session: max distance from chest before we treat it as closed. */
+  containerSessionMaxDistance: 8,
+
+  /** Fallback session: force-close after this many seconds. */
+  containerSessionMaxSeconds: 90,
 };

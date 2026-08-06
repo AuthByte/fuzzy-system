@@ -16,6 +16,10 @@ const emptyStats: Stats = {
   opened: 0,
   killed: 0,
   hit: 0,
+  picked: 0,
+  dropped: 0,
+  took: 0,
+  put: 0,
   players: 0,
   topPlayers24h: [],
   activityByHour: [],
@@ -206,7 +210,15 @@ export default function Dashboard() {
                   ? "#f472b6"
                   : item.action === "hit"
                     ? "#a3e635"
-                    : "#fb923c";
+                    : item.action === "took"
+                      ? "#fbbf24"
+                      : item.action === "put"
+                        ? "#34d399"
+                        : item.action === "picked"
+                          ? "#67e8f9"
+                          : item.action === "dropped"
+                            ? "#fdba74"
+                            : "#fb923c";
       ctx.globalAlpha = 0.85;
       ctx.arc(px, py, 3.2, 0, Math.PI * 2);
       ctx.fill();
@@ -306,6 +318,22 @@ export default function Dashboard() {
           <strong className="stat-value hit">{stats.hit ?? 0}</strong>
         </article>
         <article className="stat">
+          <span className="stat-label">Took</span>
+          <strong className="stat-value took">{stats.took ?? 0}</strong>
+        </article>
+        <article className="stat">
+          <span className="stat-label">Put</span>
+          <strong className="stat-value put">{stats.put ?? 0}</strong>
+        </article>
+        <article className="stat">
+          <span className="stat-label">Picked</span>
+          <strong className="stat-value picked">{stats.picked ?? 0}</strong>
+        </article>
+        <article className="stat">
+          <span className="stat-label">Dropped</span>
+          <strong className="stat-value dropped">{stats.dropped ?? 0}</strong>
+        </article>
+        <article className="stat">
           <span className="stat-label">Players</span>
           <strong className="stat-value">{stats.players}</strong>
         </article>
@@ -343,6 +371,10 @@ export default function Dashboard() {
                 <option value="opened">Opened</option>
                 <option value="killed">Killed</option>
                 <option value="hit">Hit</option>
+                <option value="took">Took (chest)</option>
+                <option value="put">Put (chest)</option>
+                <option value="picked">Picked up</option>
+                <option value="dropped">Dropped</option>
               </select>
             </label>
 

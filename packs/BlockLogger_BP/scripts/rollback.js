@@ -58,8 +58,8 @@ function applyInverse(entry) {
       return true;
     }
 
-    if (entry.a === "o" || entry.a === "k" || entry.a === "h") {
-      // Opens / kills / hits have no block inverse.
+    if (entry.a === "o" || entry.a === "k" || entry.a === "h" || entry.a === "i" || entry.a === "j" || entry.a === "u" || entry.a === "v") {
+      // Opens / kills / hits / item moves have no block inverse.
       return false;
     }
 
@@ -113,7 +113,7 @@ function applyForward(entry) {
       return true;
     }
 
-    if (entry.a === "o" || entry.a === "k" || entry.a === "h") {
+    if (entry.a === "o" || entry.a === "k" || entry.a === "h" || entry.a === "i" || entry.a === "j" || entry.a === "u" || entry.a === "v") {
       return false;
     }
 

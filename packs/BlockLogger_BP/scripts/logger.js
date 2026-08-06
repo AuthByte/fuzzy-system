@@ -1,6 +1,10 @@
 import { Direction, system, world } from "@minecraft/server";
 import { CONFIG } from "./config.js";
 import { snapshotStates, toPublicJson } from "./format.js";
+import {
+  beginContainerSession,
+  registerInventoryEvents,
+} from "./inventory.js";
 import { appendEntry } from "./storage.js";
 import { nowMs } from "./time.js";
 
@@ -8,6 +12,9 @@ import { nowMs } from "./time.js";
  * @typedef {import("./format.js").LogEntry} LogEntry
  * @typedef {import("@minecraft/server").Block} Block
  */
+
+/** When true, chest item diffs use interact + distance fallback (no native open/close). */
+let useFallbackContainerSessions = true;
 
 /** @type {Map<string, number>} player:x,y,z → expire tick (dedupe bucket + place) */
 const recentLiquidLogs = new Map();
@@ -340,18 +347,24 @@ function onPlayerInteractWithBlock(event) {
   }
 
   // --- Container open (chest / barrel / shulker / hopper / …) ---
-  if (CONFIG.logContainerOpens && isContainerBlock(clicked.typeId)) {
-    commit({
-      t: nowMs(),
-      p: player.name,
-      a: "o",
-      b: clicked.typeId,
-      x: clicked.x,
-      y: clicked.y,
-      z: clicked.z,
-      d: clicked.dimension.id,
-      tool: beforeId || "hand",
-    });
+  if (isContainerBlock(clicked.typeId)) {
+    if (CONFIG.logContainerOpens) {
+      commit({
+        t: nowMs(),
+        p: player.name,
+        a: "o",
+        b: clicked.typeId,
+        x: clicked.x,
+        y: clicked.y,
+        z: clicked.z,
+        d: clicked.dimension.id,
+        tool: beforeId || "hand",
+      });
+    }
+    // Native blockContainerOpened handles snapshots when available.
+    if (useFallbackContainerSessions) {
+      beginContainerSession(player, clicked, { fromFallback: true });
+    }
   }
 }
 
@@ -698,7 +711,7 @@ function maybeHttp(pub) {
 }
 
 /**
- * Subscribe to place/break/fire/liquid/explosion/kill/container events.
+ * Subscribe to place/break/fire/liquid/explosion/kill/container/item events.
  */
 export function registerLoggerEvents() {
   world.afterEvents.playerBreakBlock.subscribe(onPlayerBreakBlock);
@@ -753,4 +766,7 @@ export function registerLoggerEvents() {
       "[BlockLogger] entityHurt unavailable; projectile hit logging limited."
     );
   }
+
+  const inv = registerInventoryEvents();
+  useFallbackContainerSessions = !inv.hasNativeContainerEvents;
 }

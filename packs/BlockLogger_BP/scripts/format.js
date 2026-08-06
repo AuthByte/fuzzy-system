@@ -6,14 +6,15 @@
  *   i: number,          // id
  *   t: number,          // unix ms
  *   p: string,          // player / actor name
- *   a: "p"|"b"|"f"|"e"|"o"|"k"|"h", // placed|broken|ignited|exploded|opened|killed|hit
- *   b: string,          // block / entity type id
+ *   a: "p"|"b"|"f"|"e"|"o"|"k"|"h"|"i"|"j"|"u"|"v",
+ *       // placed|broken|ignited|exploded|opened|killed|hit|picked|dropped|took|put
+ *   b: string,          // block / entity / item type id
  *   x: number, y: number, z: number,
  *   d: string,          // dimension id
  *   s?: object,         // block states (for restore on broken/exploded)
  *   r?: number,         // rollback batch id (if this entry was rolled back)
- *   c?: number,         // collapsed count (mining bursts)
- *   tool?: string       // item / source used (flint_and_steel, tnt, …)
+ *   c?: number,         // collapsed count OR item stack amount
+ *   tool?: string       // item / source / container used
  * }
  */
 
@@ -22,7 +23,7 @@
  * @property {number} i
  * @property {number} t
  * @property {string} p
- * @property {"p"|"b"|"f"|"e"|"o"|"k"|"h"} a
+ * @property {"p"|"b"|"f"|"e"|"o"|"k"|"h"|"i"|"j"|"u"|"v"} a
  * @property {string} b
  * @property {number} x
  * @property {number} y
@@ -43,6 +44,10 @@ const ACTION_PUBLIC = {
   o: "opened",
   k: "killed",
   h: "hit",
+  i: "picked",
+  j: "dropped",
+  u: "took",
+  v: "put",
 };
 
 /** @type {Record<string, string>} */
@@ -54,6 +59,10 @@ const ACTION_CHAT = {
   o: "opened",
   k: "killed",
   h: "hit",
+  i: "picked",
+  j: "dropped",
+  u: "took",
+  v: "put",
 };
 
 /**
@@ -70,7 +79,7 @@ export function toPublicJson(entry) {
     block: entry.b,
     location: { x: entry.x, y: entry.y, z: entry.z },
     dimension: entry.d,
-    ...(entry.c && entry.c > 1 ? { count: entry.c } : {}),
+    ...(entry.c !== undefined && entry.c > 0 ? { count: entry.c } : {}),
     ...(entry.tool ? { tool: entry.tool } : {}),
     ...(entry.s && Object.keys(entry.s).length ? { states: entry.s } : {}),
     ...(entry.r !== undefined ? { rollbackId: entry.r } : {}),
@@ -85,7 +94,8 @@ export function toPublicJson(entry) {
  */
 export function formatEntryLine(entry, opts = {}) {
   const action = ACTION_CHAT[entry.a] ?? "broke";
-  const count = entry.c && entry.c > 1 ? `§e${entry.c}x ` : "";
+  const count =
+    entry.c !== undefined && entry.c > 0 ? `§e${entry.c}x ` : "";
   const loc = `${entry.x} ${entry.y} ${entry.z}`;
   const dim = shortDimension(entry.d);
   const tool = entry.tool
