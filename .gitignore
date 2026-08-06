@@ -11,3 +11,8 @@ web/.vercel
 *.sqlite
 *.sqlite-*
 .next/
+dist/
+
+# Ship the installable pack
+!releases/
+!releases/*.mcpack
