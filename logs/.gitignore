@@ -1,2 +1,5 @@
-logs/**
-!logs/blocklogger/.gitkeep
+*
+!.gitignore
+!blocklogger/
+blocklogger/*
+!blocklogger/.gitkeep
