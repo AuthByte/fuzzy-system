@@ -16,3 +16,4 @@ dist/
 # Ship the installable pack
 !releases/
 !releases/*.mcpack
+web/data/

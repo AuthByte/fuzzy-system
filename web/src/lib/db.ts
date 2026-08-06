@@ -1,8 +1,11 @@
 import { neon } from "@neondatabase/serverless";
 import { get, put } from "@vercel/blob";
+import fs from "node:fs";
+import path from "node:path";
 import type { LogEvent, LogFilters, QueryResult, Stats } from "./types";
 
 const BLOB_PATH = "blocklogger/logs.json";
+const LOCAL_PATH = path.join(process.cwd(), "data", "local-logs.json");
 
 type StoredRow = {
   id: number;
@@ -28,10 +31,38 @@ function hasBlob() {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 }
 
-export function storageMode(): "neon" | "blob" | "none" {
+export function storageMode(): "neon" | "blob" | "local" {
   if (getSql()) return "neon";
   if (hasBlob()) return "blob";
-  return "none";
+  return "local";
+}
+
+function readLocalRows(): StoredRow[] {
+  try {
+    if (!fs.existsSync(LOCAL_PATH)) return [];
+    const parsed = JSON.parse(fs.readFileSync(LOCAL_PATH, "utf8"));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalRows(rows: StoredRow[]) {
+  fs.mkdirSync(path.dirname(LOCAL_PATH), { recursive: true });
+  fs.writeFileSync(LOCAL_PATH, JSON.stringify(rows, null, 2) + "\n", "utf8");
+}
+
+async function readStoreRows(): Promise<StoredRow[]> {
+  const mode = storageMode();
+  if (mode === "blob") return readBlobRows();
+  if (mode === "local") return readLocalRows();
+  return [];
+}
+
+async function writeStoreRows(rows: StoredRow[]) {
+  const mode = storageMode();
+  if (mode === "blob") return writeBlobRows(rows);
+  if (mode === "local") return writeLocalRows(rows);
 }
 
 export async function ensureSchema() {
@@ -142,12 +173,6 @@ export async function insertLogs(
   items: Record<string, unknown>[]
 ): Promise<LogEvent[]> {
   const mode = storageMode();
-  if (mode === "none") {
-    throw new Error(
-      "No storage configured. Set DATABASE_URL (Neon) or BLOB_READ_WRITE_TOKEN on Vercel."
-    );
-  }
-
   const rows = items.map((item) => normalizeLog(item));
 
   if (mode === "neon") {
@@ -168,11 +193,11 @@ export async function insertLogs(
     return out;
   }
 
-  const existing = await readBlobRows();
+  const existing = await readStoreRows();
   let nextId = existing.reduce((max, r) => Math.max(max, r.id), 0) + 1;
   const added = rows.map((row) => ({ ...row, id: nextId++ }));
   const merged = [...existing, ...added].slice(-20000);
-  await writeBlobRows(merged);
+  await writeStoreRows(merged);
   return added.map(rowToEvent);
 }
 
@@ -208,15 +233,11 @@ function applyFilters(rows: StoredRow[], filters: LogFilters): StoredRow[] {
 
 export async function queryLogs(filters: LogFilters = {}): Promise<QueryResult> {
   const mode = storageMode();
-  if (mode === "none") {
-    return { total: 0, limit: 100, offset: 0, items: [] };
-  }
-
   const limit = Math.min(Math.max(Number(filters.limit ?? 100), 1), 1000);
   const offset = Math.max(Number(filters.offset ?? 0), 0);
 
-  if (mode === "blob") {
-    const all = applyFilters(await readBlobRows(), filters).sort(
+  if (mode === "blob" || mode === "local") {
+    const all = applyFilters(await readStoreRows(), filters).sort(
       (a, b) => b.time_ms - a.time_ms || b.id - a.id
     );
     return {
@@ -230,9 +251,6 @@ export async function queryLogs(filters: LogFilters = {}): Promise<QueryResult> 
   await ensureSchema();
   const sql = getSql()!;
 
-  // Neon tagged templates don't love fully dynamic WHERE easily;
-  // fetch a bounded recent window then filter in process for simplicity at this scale,
-  // or use a few dedicated query shapes. For correctness + filters, use SQL with optional clauses via raw building carefully.
   const recent = (await sql`
     SELECT id, time_ms, player, action, block, x, y, z, dimension, states_json, source
     FROM logs
@@ -251,20 +269,9 @@ export async function queryLogs(filters: LogFilters = {}): Promise<QueryResult> 
 
 export async function getStats(): Promise<Stats> {
   const mode = storageMode();
-  if (mode === "none") {
-    return {
-      total: 0,
-      placed: 0,
-      broken: 0,
-      players: 0,
-      topPlayers24h: [],
-      activityByHour: [],
-    };
-  }
-
   const rows =
-    mode === "blob"
-      ? await readBlobRows()
+    mode === "blob" || mode === "local"
+      ? await readStoreRows()
       : ((await getSql()!`
           SELECT id, time_ms, player, action, block, x, y, z, dimension, states_json, source
           FROM logs

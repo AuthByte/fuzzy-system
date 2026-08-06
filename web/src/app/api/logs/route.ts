@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { assertApiKey } from "@/lib/auth";
-import { insertLogs, queryLogs, storageMode } from "@/lib/db";
+import { insertLogs, queryLogs } from "@/lib/db";
 
 export const runtime = "nodejs";
 
@@ -41,16 +41,6 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     assertApiKey(req);
-    if (storageMode() === "none") {
-      return NextResponse.json(
-        {
-          error:
-            "Storage not configured. In Vercel → Storage, create Neon Postgres (DATABASE_URL) or Blob (BLOB_READ_WRITE_TOKEN).",
-        },
-        { status: 503 }
-      );
-    }
-
     const body = await req.json();
     const items = Array.isArray(body)
       ? body
