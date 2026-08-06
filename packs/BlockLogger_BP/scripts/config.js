@@ -16,10 +16,11 @@ export const CONFIG = {
   chunkCharLimit: 30000,
 
   /**
-   * Soft cap on total retained log entries.
-   * Oldest entries are pruned when this is exceeded.
+   * Soft cap on retained log entries.
+   * Set to 0 for unlimited (no pruning). Minecraft world storage still has
+   * a hard engine limit eventually, but we won't delete old entries ourselves.
    */
-  maxEntries: 8000,
+  maxEntries: 0,
 
   /** How many matching entries to show in chat lookups by default. */
   lookupLimit: 12,

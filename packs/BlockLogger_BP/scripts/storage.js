@@ -135,8 +135,10 @@ export function appendEntry(partial) {
   const entries = getAllEntries();
   entries.push(entry);
 
-  while (entries.length > CONFIG.maxEntries) {
-    entries.shift();
+  if (CONFIG.maxEntries > 0) {
+    while (entries.length > CONFIG.maxEntries) {
+      entries.shift();
+    }
   }
 
   persistEntries(entries);

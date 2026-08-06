@@ -161,7 +161,7 @@ function lookupCoords(player, x, y, z) {
 function showStats(player) {
   const meta = getMeta();
   player.sendMessage(
-    `§a[BlockLogger] Entries: §f${meta.count}§a · Chunks: §f${meta.chunks}§a · Next ID: §f${meta.nextId}§a · Soft cap: §f${CONFIG.maxEntries}`
+    `§a[BlockLogger] Entries: §f${meta.count}§a · Chunks: §f${meta.chunks}§a · Next ID: §f${meta.nextId}§a · Cap: §f${CONFIG.maxEntries > 0 ? CONFIG.maxEntries : "unlimited"}`
   );
 }
 
