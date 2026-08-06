@@ -5,15 +5,15 @@
  * {
  *   i: number,          // id
  *   t: number,          // unix ms
- *   p: string,          // player name
- *   a: "p"|"b"|"f",     // placed | broken | fire/ignite
- *   b: string,          // block type id (water/lava/fire/etc.)
+ *   p: string,          // player / actor name
+ *   a: "p"|"b"|"f"|"e"|"o"|"k",  // placed|broken|ignited|exploded|opened|killed
+ *   b: string,          // block / entity type id
  *   x: number, y: number, z: number,
  *   d: string,          // dimension id
- *   s?: object,         // block states (for restore on broken)
+ *   s?: object,         // block states (for restore on broken/exploded)
  *   r?: number,         // rollback batch id (if this entry was rolled back)
  *   c?: number,         // collapsed count (mining bursts)
- *   tool?: string       // item used (flint_and_steel, water_bucket, …)
+ *   tool?: string       // item / source used (flint_and_steel, tnt, …)
  * }
  */
 
@@ -22,7 +22,7 @@
  * @property {number} i
  * @property {number} t
  * @property {string} p
- * @property {"p"|"b"|"f"} a
+ * @property {"p"|"b"|"f"|"e"|"o"|"k"} a
  * @property {string} b
  * @property {number} x
  * @property {number} y
@@ -34,13 +34,32 @@
  * @property {string=} tool
  */
 
+/** @type {Record<string, string>} */
+const ACTION_PUBLIC = {
+  p: "placed",
+  b: "broken",
+  f: "ignited",
+  e: "exploded",
+  o: "opened",
+  k: "killed",
+};
+
+/** @type {Record<string, string>} */
+const ACTION_CHAT = {
+  p: "placed",
+  b: "broke",
+  f: "ignited",
+  e: "exploded",
+  o: "opened",
+  k: "killed",
+};
+
 /**
  * @param {LogEntry} entry
  * @returns {object}
  */
 export function toPublicJson(entry) {
-  const action =
-    entry.a === "p" ? "placed" : entry.a === "f" ? "ignited" : "broken";
+  const action = ACTION_PUBLIC[entry.a] ?? "broken";
   return {
     id: entry.i,
     time: new Date(entry.t).toISOString(),
@@ -63,12 +82,13 @@ export function toPublicJson(entry) {
  * @returns {string}
  */
 export function formatEntryLine(entry, opts = {}) {
-  const action =
-    entry.a === "p" ? "placed" : entry.a === "f" ? "ignited" : "broke";
+  const action = ACTION_CHAT[entry.a] ?? "broke";
   const count = entry.c && entry.c > 1 ? `§e${entry.c}x ` : "";
   const loc = `${entry.x} ${entry.y} ${entry.z}`;
   const dim = shortDimension(entry.d);
-  const tool = entry.tool ? ` §8with §7${entry.tool.replace("minecraft:", "")}` : "";
+  const tool = entry.tool
+    ? ` §8with §7${String(entry.tool).replace("minecraft:", "")}`
+    : "";
   let line = `§7#${entry.i} §f${entry.p} §e${action} ${count}§b${entry.b}${tool} §7@ §f${loc} §8(${dim})`;
   if (opts.includeAge !== false) {
     const ageMs = (opts.now ?? Date.now()) - entry.t;

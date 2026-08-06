@@ -12,6 +12,9 @@ const emptyStats: Stats = {
   placed: 0,
   broken: 0,
   ignited: 0,
+  exploded: 0,
+  opened: 0,
+  killed: 0,
   players: 0,
   topPlayers24h: [],
   activityByHour: [],
@@ -189,7 +192,18 @@ export default function Dashboard() {
       const px = pad + ((item.location.x - minX) / spanX) * (cssW - pad * 2);
       const py = pad + ((item.location.z - minZ) / spanZ) * (cssH - pad * 2);
       ctx.beginPath();
-      ctx.fillStyle = item.action === "placed" ? "#5eead4" : "#fb923c";
+      ctx.fillStyle =
+        item.action === "placed"
+          ? "#5eead4"
+          : item.action === "ignited"
+            ? "#f87171"
+            : item.action === "exploded"
+              ? "#c084fc"
+              : item.action === "opened"
+                ? "#38bdf8"
+                : item.action === "killed"
+                  ? "#f472b6"
+                  : "#fb923c";
       ctx.globalAlpha = 0.85;
       ctx.arc(px, py, 3.2, 0, Math.PI * 2);
       ctx.fill();
@@ -264,14 +278,26 @@ export default function Dashboard() {
           <span className="stat-label">Placed</span>
           <strong className="stat-value placed">{stats.placed}</strong>
         </article>
-      <article className="stat">
-        <span className="stat-label">Broken</span>
-        <strong className="stat-value broken">{stats.broken}</strong>
-      </article>
-      <article className="stat">
-        <span className="stat-label">Ignited</span>
-        <strong className="stat-value ignited">{stats.ignited ?? 0}</strong>
-      </article>
+        <article className="stat">
+          <span className="stat-label">Broken</span>
+          <strong className="stat-value broken">{stats.broken}</strong>
+        </article>
+        <article className="stat">
+          <span className="stat-label">Ignited</span>
+          <strong className="stat-value ignited">{stats.ignited ?? 0}</strong>
+        </article>
+        <article className="stat">
+          <span className="stat-label">Exploded</span>
+          <strong className="stat-value exploded">{stats.exploded ?? 0}</strong>
+        </article>
+        <article className="stat">
+          <span className="stat-label">Opened</span>
+          <strong className="stat-value opened">{stats.opened ?? 0}</strong>
+        </article>
+        <article className="stat">
+          <span className="stat-label">Killed</span>
+          <strong className="stat-value killed">{stats.killed ?? 0}</strong>
+        </article>
         <article className="stat">
           <span className="stat-label">Players</span>
           <strong className="stat-value">{stats.players}</strong>
@@ -306,6 +332,9 @@ export default function Dashboard() {
                 <option value="placed">Placed</option>
                 <option value="broken">Broken</option>
                 <option value="ignited">Ignited</option>
+                <option value="exploded">Exploded</option>
+                <option value="opened">Opened</option>
+                <option value="killed">Killed</option>
               </select>
             </label>
 
