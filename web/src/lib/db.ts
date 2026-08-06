@@ -11,7 +11,7 @@ type StoredRow = {
   id: number;
   time_ms: number;
   player: string;
-  action: "placed" | "broken" | "ignited";
+  action: import("./types").LogAction;
   block: string;
   x: number;
   y: number;
@@ -73,7 +73,7 @@ export async function ensureSchema() {
       id BIGSERIAL PRIMARY KEY,
       time_ms BIGINT NOT NULL,
       player TEXT NOT NULL,
-      action TEXT NOT NULL CHECK (action IN ('placed', 'broken', 'ignited')),
+      action TEXT NOT NULL,
       block TEXT NOT NULL,
       x INTEGER NOT NULL,
       y INTEGER NOT NULL,
@@ -84,15 +84,24 @@ export async function ensureSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
+  // Widen older CHECK constraints that only allowed placed/broken/ignited.
+  try {
+    await sql`ALTER TABLE logs DROP CONSTRAINT IF EXISTS logs_action_check`;
+  } catch {
+    // ignore — constraint name may differ on some Neon forks
+  }
   await sql`CREATE INDEX IF NOT EXISTS idx_logs_time ON logs(time_ms DESC)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_logs_player ON logs(player)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_logs_coords ON logs(x, y, z)`;
 }
 
-function normalizeAction(raw: unknown): "placed" | "broken" | "ignited" {
+function normalizeAction(raw: unknown): import("./types").LogAction {
   if (raw === "placed" || raw === "p") return "placed";
   if (raw === "broken" || raw === "b" || raw === "broke") return "broken";
   if (raw === "ignited" || raw === "f" || raw === "fire" || raw === "lit") return "ignited";
+  if (raw === "exploded" || raw === "e" || raw === "explode") return "exploded";
+  if (raw === "opened" || raw === "o" || raw === "open") return "opened";
+  if (raw === "killed" || raw === "k" || raw === "kill" || raw === "death") return "killed";
   throw new Error(`Invalid action: ${String(raw)}`);
 }
 
@@ -283,6 +292,9 @@ export async function getStats(): Promise<Stats> {
   const placed = rows.filter((r) => r.action === "placed").length;
   const broken = rows.filter((r) => r.action === "broken").length;
   const ignited = rows.filter((r) => r.action === "ignited").length;
+  const exploded = rows.filter((r) => r.action === "exploded").length;
+  const opened = rows.filter((r) => r.action === "opened").length;
+  const killed = rows.filter((r) => r.action === "killed").length;
 
   const topMap = new Map<string, number>();
   for (const row of rows) {
@@ -312,6 +324,9 @@ export async function getStats(): Promise<Stats> {
     placed,
     broken,
     ignited,
+    exploded,
+    opened,
+    killed,
     players: players.size,
     topPlayers24h,
     activityByHour,

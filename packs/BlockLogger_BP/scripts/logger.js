@@ -284,59 +284,198 @@ function onPlayerInteractWithBlock(event) {
   }
 
   // --- Fire tools ---
-  if (!CONFIG.fireTools.includes(beforeId)) return;
+  if (CONFIG.fireTools.includes(beforeId)) {
+    // Defer one tick so fire/campfire/TNT state can update.
+    system.run(() => {
+      try {
+        const adjacent = blockOnFace(clicked, event.blockFace);
+        const litId = clicked.typeId;
+        const adjId = adjacent?.typeId;
 
-  // Defer one tick so fire/campfire/TNT state can update.
-  system.run(() => {
-    try {
-      const adjacent = blockOnFace(clicked, event.blockFace);
-      const litId = clicked.typeId;
-      const adjId = adjacent?.typeId;
+        /** @type {Block | undefined} */
+        let target = undefined;
+        /** @type {string} */
+        let blockName = "minecraft:fire";
 
-      /** @type {Block | undefined} */
-      let target = undefined;
-      /** @type {string} */
-      let blockName = "minecraft:fire";
+        if (adjacent && CONFIG.fireBlocks.includes(adjId ?? "")) {
+          target = adjacent;
+          blockName = adjId ?? "minecraft:fire";
+        } else if (
+          litId.includes("campfire") ||
+          litId === "minecraft:tnt" ||
+          litId.includes("candle")
+        ) {
+          // Lit campfire / primed TNT / candle — log the interacted block.
+          target = clicked;
+          blockName = litId;
+        } else if (CONFIG.fireBlocks.includes(litId)) {
+          target = clicked;
+          blockName = litId;
+        } else if (adjacent) {
+          // Still log intended fire spot even if engine rejected placement.
+          target = adjacent;
+          blockName = "minecraft:fire";
+        } else {
+          target = clicked;
+          blockName = litId || "minecraft:fire";
+        }
 
-      if (adjacent && CONFIG.fireBlocks.includes(adjId ?? "")) {
-        target = adjacent;
-        blockName = adjId ?? "minecraft:fire";
-      } else if (
-        litId.includes("campfire") ||
-        litId === "minecraft:tnt" ||
-        litId.includes("candle")
-      ) {
-        // Lit campfire / primed TNT / candle — log the interacted block.
-        target = clicked;
-        blockName = litId;
-      } else if (CONFIG.fireBlocks.includes(litId)) {
-        target = clicked;
-        blockName = litId;
-      } else if (adjacent) {
-        // Still log intended fire spot even if engine rejected placement.
-        target = adjacent;
-        blockName = "minecraft:fire";
-      } else {
-        target = clicked;
-        blockName = litId || "minecraft:fire";
+        commit({
+          t: nowMs(),
+          p: player.name,
+          a: "f",
+          b: blockName,
+          x: target.x,
+          y: target.y,
+          z: target.z,
+          d: target.dimension.id,
+          s: snapshotStates(target.permutation),
+          tool: beforeId,
+        });
+      } catch (err) {
+        console.warn(`[BlockLogger] fire log failed: ${err}`);
       }
+    });
+    return;
+  }
 
-      commit({
-        t: nowMs(),
-        p: player.name,
-        a: "f",
-        b: blockName,
-        x: target.x,
-        y: target.y,
-        z: target.z,
-        d: target.dimension.id,
-        s: snapshotStates(target.permutation),
-        tool: beforeId,
-      });
-    } catch (err) {
-      console.warn(`[BlockLogger] fire log failed: ${err}`);
+  // --- Container open (chest / barrel / shulker / hopper / …) ---
+  if (CONFIG.logContainerOpens && isContainerBlock(clicked.typeId)) {
+    commit({
+      t: nowMs(),
+      p: player.name,
+      a: "o",
+      b: clicked.typeId,
+      x: clicked.x,
+      y: clicked.y,
+      z: clicked.z,
+      d: clicked.dimension.id,
+      tool: beforeId || "hand",
+    });
+  }
+}
+
+/**
+ * @param {string} typeId
+ * @returns {boolean}
+ */
+function isContainerBlock(typeId) {
+  if (!typeId) return false;
+  for (const needle of CONFIG.containerBlocks) {
+    if (typeId === needle || typeId.includes(needle)) return true;
+  }
+  return false;
+}
+
+/**
+ * Best-effort actor label for non-player sources (TNT, creeper, …).
+ * @param {import("@minecraft/server").Entity | undefined} entity
+ * @returns {string}
+ */
+function actorLabel(entity) {
+  if (!entity) return "Unknown";
+  if (entity.typeId === "minecraft:player") {
+    return entity.name ?? entity.nameTag ?? "Unknown";
+  }
+  if (entity.nameTag) return entity.nameTag;
+  return String(entity.typeId || "unknown").replace("minecraft:", "");
+}
+
+/**
+ * Blocks destroyed by an explosion (TNT, creeper, bed, crystal, …).
+ * Fires once per destroyed block, with the pre-explosion permutation.
+ * @param {import("@minecraft/server").BlockExplodeAfterEvent} event
+ */
+function onBlockExplode(event) {
+  if (!CONFIG.logExplosions) return;
+
+  try {
+    const perm = event.explodedBlockPermutation;
+    const blockId =
+      perm?.type?.id ??
+      // @ts-ignore
+      perm?.typeId ??
+      "minecraft:air";
+    if (!blockId || blockId === "minecraft:air") return;
+
+    const block = event.block;
+    if (!block) return;
+
+    const source = event.source;
+    commit({
+      t: nowMs(),
+      p: actorLabel(source),
+      a: "e",
+      b: blockId,
+      x: block.x,
+      y: block.y,
+      z: block.z,
+      d: block.dimension.id,
+      s: snapshotStates(perm),
+      tool: source?.typeId ?? "explosion",
+    });
+  } catch (err) {
+    console.warn(`[BlockLogger] explosion log failed: ${err}`);
+  }
+}
+
+/**
+ * Player / protected-entity kills.
+ * @param {import("@minecraft/server").EntityDieAfterEvent} event
+ */
+function onEntityDie(event) {
+  if (!CONFIG.logKills) return;
+
+  try {
+    const dead = event.deadEntity;
+    if (!dead) return;
+
+    const damage = event.damageSource;
+    const killer = damage?.damagingEntity;
+    const cause = damage?.cause ? String(damage.cause) : "unknown";
+
+    const victimIsPlayer = dead.typeId === "minecraft:player";
+    const killerIsPlayer = killer?.typeId === "minecraft:player";
+    const protectedVictim = CONFIG.killLogEntities.includes(dead.typeId);
+
+    if (!victimIsPlayer && !killerIsPlayer && !protectedVictim) return;
+
+    const loc = dead.location;
+    if (!loc) return;
+
+    let dimId = "minecraft:overworld";
+    try {
+      dimId = dead.dimension?.id ?? dimId;
+    } catch {
+      // entity may already be invalid for dimension access
     }
-  });
+
+    const actor = killerIsPlayer
+      ? killer.name ?? killer.nameTag ?? "Unknown"
+      : killer
+        ? actorLabel(killer)
+        : `#${cause}`;
+
+    const victimLabel = victimIsPlayer
+      ? `player:${dead.name ?? dead.nameTag ?? "Unknown"}`
+      : dead.typeId;
+
+    commit({
+      t: nowMs(),
+      p: String(actor),
+      a: "k",
+      b: victimLabel,
+      x: Math.floor(loc.x),
+      y: Math.floor(loc.y),
+      z: Math.floor(loc.z),
+      d: dimId,
+      tool: killer?.typeId
+        ? `${cause}/${killer.typeId}`
+        : cause,
+    });
+  } catch (err) {
+    console.warn(`[BlockLogger] kill log failed: ${err}`);
+  }
 }
 
 /**
@@ -433,7 +572,7 @@ function maybeHttp(pub) {
 }
 
 /**
- * Subscribe to place/break/fire/liquid events.
+ * Subscribe to place/break/fire/liquid/explosion/kill/container events.
  */
 export function registerLoggerEvents() {
   world.afterEvents.playerBreakBlock.subscribe(onPlayerBreakBlock);
@@ -451,11 +590,25 @@ export function registerLoggerEvents() {
     after.playerInteractWithBlock.subscribe(onPlayerInteractWithBlock);
   } else {
     console.warn(
-      "[BlockLogger] playerInteractWithBlock unavailable; bucket/fire logging limited."
+      "[BlockLogger] playerInteractWithBlock unavailable; bucket/fire/container logging limited."
     );
   }
 
   if (after.projectileHitBlock) {
     after.projectileHitBlock.subscribe(onProjectileHitBlock);
+  }
+
+  if (after.blockExplode) {
+    after.blockExplode.subscribe(onBlockExplode);
+  } else {
+    console.warn(
+      "[BlockLogger] blockExplode unavailable; explosion logging disabled."
+    );
+  }
+
+  if (after.entityDie) {
+    after.entityDie.subscribe(onEntityDie);
+  } else {
+    console.warn("[BlockLogger] entityDie unavailable; kill logging disabled.");
   }
 }

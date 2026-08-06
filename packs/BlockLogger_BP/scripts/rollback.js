@@ -49,13 +49,18 @@ function applyInverse(entry) {
       return true;
     }
 
-    if (entry.a === "b") {
+    if (entry.a === "b" || entry.a === "e") {
       if (entry.s && Object.keys(entry.s).length) {
         block.setPermutation(BlockPermutation.resolve(entry.b, entry.s));
       } else {
         block.setType(entry.b);
       }
       return true;
+    }
+
+    if (entry.a === "o" || entry.a === "k") {
+      // Opens / kills have no block inverse.
+      return false;
     }
 
     if (entry.a === "f") {
@@ -103,9 +108,13 @@ function applyForward(entry) {
       return true;
     }
 
-    if (entry.a === "b") {
+    if (entry.a === "b" || entry.a === "e") {
       block.setType("minecraft:air");
       return true;
+    }
+
+    if (entry.a === "o" || entry.a === "k") {
+      return false;
     }
 
     if (entry.a === "f") {

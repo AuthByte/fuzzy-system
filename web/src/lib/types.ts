@@ -1,4 +1,10 @@
-export type LogAction = "placed" | "broken" | "ignited";
+export type LogAction =
+  | "placed"
+  | "broken"
+  | "ignited"
+  | "exploded"
+  | "opened"
+  | "killed";
 
 export type LogEvent = {
   id?: number | string;
@@ -40,6 +46,9 @@ export type Stats = {
   placed: number;
   broken: number;
   ignited: number;
+  exploded: number;
+  opened: number;
+  killed: number;
   players: number;
   topPlayers24h: { player: string; c: number }[];
   activityByHour: { hour: string; count: number }[];

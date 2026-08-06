@@ -99,4 +99,55 @@ export const CONFIG = {
     "minecraft:flowing_lava",
     "minecraft:powder_snow",
   ],
+
+  /** Log blocks destroyed by TNT / creepers / beds / crystals / etc. */
+  logExplosions: true,
+
+  /** Log who opens chests, barrels, shulkers, hoppers, furnaces, … */
+  logContainerOpens: true,
+
+  /**
+   * Log kills when a player is the killer or victim, or the victim type
+   * is in killLogEntities (armor stands, villagers, frames, …).
+   */
+  logKills: true,
+
+  /**
+   * Entity type ids always logged on death (even if no player involved).
+   * Keep this short — mob farms would flood storage otherwise.
+   */
+  killLogEntities: [
+    "minecraft:armor_stand",
+    "minecraft:villager",
+    "minecraft:wandering_trader",
+    "minecraft:iron_golem",
+    "minecraft:item_frame",
+    "minecraft:glow_item_frame",
+    "minecraft:painting",
+    "minecraft:minecart",
+    "minecraft:chest_minecart",
+    "minecraft:hopper_minecart",
+    "minecraft:tnt_minecart",
+    "minecraft:boat",
+    "minecraft:chest_boat",
+  ],
+
+  /**
+   * Block type ids (or suffixes) treated as containers when right-clicked.
+   * Full ids and simple includes() needles are both supported.
+   */
+  containerBlocks: [
+    "minecraft:chest",
+    "minecraft:trapped_chest",
+    "minecraft:barrel",
+    "minecraft:hopper",
+    "minecraft:dropper",
+    "minecraft:dispenser",
+    "minecraft:furnace",
+    "minecraft:blast_furnace",
+    "minecraft:smoker",
+    "minecraft:brewing_stand",
+    "minecraft:ender_chest",
+    "shulker_box",
+  ],
 };
