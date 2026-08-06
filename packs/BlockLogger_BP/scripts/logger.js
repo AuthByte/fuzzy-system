@@ -30,8 +30,7 @@ export function onPlayerPlaceBlock(event) {
   };
 
   const entry = appendEntry(partial);
-  maybeDebug(entry);
-  maybeHttp(entry);
+  exportEntry(entry);
 }
 
 /**
@@ -61,37 +60,43 @@ export function onPlayerBreakBlock(event) {
   };
 
   const entry = appendEntry(partial);
-  maybeDebug(entry);
-  maybeHttp(entry);
+  exportEntry(entry);
 }
 
 /**
+ * Emit structured console lines for the BDS bridge and optional HTTP.
  * @param {LogEntry} entry
  */
-function maybeDebug(entry) {
-  if (!CONFIG.debugConsole) return;
-  console.warn(`[BlockLogger] ${JSON.stringify(toPublicJson(entry))}`);
+function exportEntry(entry) {
+  const pub = toPublicJson(entry);
+
+  if (CONFIG.debugConsole || CONFIG.bridgeConsole) {
+    // tools/bds-bridge.mjs scrapes lines containing BLJSON:
+    console.warn(`BLJSON:${JSON.stringify(pub)}`);
+  }
+
+  maybeHttp(pub);
 }
 
 /**
- * Optional external POST for Bedrock Dedicated Server setups.
- * Intentionally a no-op unless httpEndpoint is set and fetch exists.
- * @param {LogEntry} entry
+ * Optional direct HTTP POST (BDS with networking / custom runtime).
+ * Prefer the console + bds-bridge path to avoid Beta APIs.
+ * @param {object} pub
  */
-function maybeHttp(entry) {
+function maybeHttp(pub) {
   const endpoint = CONFIG.httpEndpoint;
   if (!endpoint) return;
 
-  // Global fetch is not available in standard Script API.
-  // BDS packs that add networking should replace this hook.
   try {
-    // @ts-ignore
+    // @ts-ignore — fetch is not part of stock Script API
     if (typeof fetch === "function") {
+      const headers = { "Content-Type": "application/json" };
+      if (CONFIG.httpApiKey) headers["X-BlockLogger-Key"] = CONFIG.httpApiKey;
       // @ts-ignore
       fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(toPublicJson(entry)),
+        headers,
+        body: JSON.stringify(pub),
       });
     }
   } catch (err) {
@@ -105,8 +110,6 @@ function maybeHttp(entry) {
 export function registerLoggerEvents() {
   world.afterEvents.playerBreakBlock.subscribe(onPlayerBreakBlock);
 
-  // playerPlaceBlock is available on current @minecraft/server releases.
-  // Guard so older runtimes fail gracefully for place logging only.
   const after = world.afterEvents;
   if (after.playerPlaceBlock) {
     after.playerPlaceBlock.subscribe(onPlayerPlaceBlock);

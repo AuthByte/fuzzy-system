@@ -43,12 +43,19 @@ export const CONFIG = {
   debugConsole: false,
 
   /**
-   * Optional Bedrock Dedicated Server HTTP endpoint.
-   * Leave empty to store logs only in world dynamic properties.
-   * Example: "http://127.0.0.1:8787/block-log"
-   *
-   * Requires @minecraft/server-net on BDS with outbound HTTP enabled.
-   * This pack does not depend on server-net by default.
+   * Emit BLJSON:... lines for tools/bds-bridge.mjs to scrape.
+   * Enable on Bedrock Dedicated Server when you run the dashboard bridge.
+   * Does NOT require Beta APIs.
+   */
+  bridgeConsole: true,
+
+  /**
+   * Optional direct HTTP endpoint (if your runtime provides fetch), e.g.
+   * "http://127.0.0.1:8787/api/logs" or ".../block-log".
+   * Prefer bridgeConsole + tools/bds-bridge.mjs on stock BDS.
    */
   httpEndpoint: "",
+
+  /** Shared secret sent as X-BlockLogger-Key when httpEndpoint is set. */
+  httpApiKey: "",
 };
