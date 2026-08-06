@@ -23,6 +23,8 @@ Stable `@minecraft/server` only. Do **not** enable Beta APIs. Works on existing 
 2. Activate it on your world
 3. In chat: `!bl help`
 
+Logs **block place/break**, **fire**, and **water / lava / powder snow** from buckets (pour + scoop).
+
 ### Useful commands
 
 ```

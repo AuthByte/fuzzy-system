@@ -69,4 +69,34 @@ export const CONFIG = {
    * Block ids that are fire itself (also caught via place events).
    */
   fireBlocks: ["minecraft:fire", "minecraft:soul_fire"],
+
+  /**
+   * Full bucket → fluid block placed when emptied.
+   * (Creative mode may keep the full bucket; we still scan for the fluid.)
+   */
+  liquidPlaceBuckets: {
+    "minecraft:water_bucket": "minecraft:water",
+    "minecraft:lava_bucket": "minecraft:lava",
+    "minecraft:powder_snow_bucket": "minecraft:powder_snow",
+  },
+
+  /**
+   * Empty bucket → fluid removed when filled.
+   */
+  liquidPickupResults: {
+    "minecraft:water_bucket": "minecraft:water",
+    "minecraft:lava_bucket": "minecraft:lava",
+    "minecraft:powder_snow_bucket": "minecraft:powder_snow",
+  },
+
+  /**
+   * Block ids treated as liquids / fluid sources for logging + dedupe.
+   */
+  liquidBlocks: [
+    "minecraft:water",
+    "minecraft:lava",
+    "minecraft:flowing_water",
+    "minecraft:flowing_lava",
+    "minecraft:powder_snow",
+  ],
 };
