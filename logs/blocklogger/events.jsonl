@@ -1,0 +1,2 @@
+{"time":"2026-08-06T00:45:00.000Z","time_ms":1785977100000,"player":"Finn","action":"placed","block":"minecraft:oak_log","location":{"x":1,"y":64,"z":2},"dimension":"minecraft:overworld","source":"bds-console"}
+{"time":"2026-08-06T00:55:47.400Z","time_ms":1785977747400,"player":"Steve","action":"broken","block":"minecraft:stone","location":{"x":3,"y":4,"z":5},"dimension":"minecraft:overworld","source":"local-json"}

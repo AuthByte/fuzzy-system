@@ -33,6 +33,29 @@ Stable `@minecraft/server` only. Do **not** enable Beta APIs. Works on existing 
 !bl rollback Finn 1h
 ```
 
+## Save logs as JSON on your PC
+
+Minecraft **cannot** write a random folder on your phone/console by itself. On a PC you can save JSON files locally:
+
+```bash
+# Pipe BDS (or any BLJSON console output) into the local saver
+./bedrock_server 2>&1 | node tools/local-json-logger.mjs
+
+# Or paste/import a !bl dump file
+node tools/local-json-logger.mjs --import dump.json
+```
+
+Files land in:
+
+```
+logs/blocklogger/
+  events.jsonl      # one event per line (append-only)
+  2026-08-06.json   # that day's events
+  latest.json       # last 500 events
+```
+
+Optional: also sync those events to Vercel by setting `BLOCKLOGGER_URL=https://your-app.vercel.app/api/logs`.
+
 ## Host the website on Vercel
 
 The app lives in `web/` (Next.js).
@@ -44,6 +67,8 @@ The app lives in `web/` (Next.js).
    - **Blob** (sets `BLOB_READ_WRITE_TOKEN`)
 4. Optional env: `BLOCKLOGGER_API_KEY` (protects imports/POSTs)
 5. Deploy → open `https://your-project.vercel.app`
+
+Or give this agent a `VERCEL_TOKEN` and it can deploy for you.
 
 Local preview:
 
@@ -59,14 +84,13 @@ npm run dev
 
 1. Play with the pack on
 2. `!bl dump`
-3. Open your Vercel URL → **Import from game** → paste → Import
+3. Open your Vercel URL → **Import from game** → paste → Import  
+   **or** save on PC: `node tools/local-json-logger.mjs --import dump.json`
 
 **Bedrock Dedicated Server (auto)**
 
 ```bash
-# point bridge at your Vercel deployment
-export BLOCKLOGGER_URL='https://your-project.vercel.app/api/logs'
-export BLOCKLOGGER_API_KEY='optional-secret'
+export BLOCKLOGGER_URL='https://your-project.vercel.app/api/logs'  # optional
 ./bedrock_server 2>&1 | node tools/bds-bridge.mjs
 ```
 
@@ -82,11 +106,13 @@ Pack setting `bridgeConsole: true` (default) emits `BLJSON:` lines for the bridg
 ## Project layout
 
 ```
-packs/BlockLogger_BP/   # Bedrock behavior pack
-web/                    # Next.js site for Vercel
-dashboard/              # Older local Express+SQLite demo (optional)
-tools/bds-bridge.mjs    # BDS → website bridge
+packs/BlockLogger_BP/      # Bedrock behavior pack
+web/                       # Next.js site for Vercel
+logs/blocklogger/          # local JSON output (gitignored contents)
+tools/local-json-logger.mjs
+tools/bds-bridge.mjs
 tools/package.py
+dashboard/                 # older local Express demo (optional)
 ```
 
 ## License
