@@ -212,6 +212,18 @@ code {
 .stat-value.hit {
   color: #a3e635;
 }
+.stat-value.took {
+  color: #fbbf24;
+}
+.stat-value.put {
+  color: #34d399;
+}
+.stat-value.picked {
+  color: #67e8f9;
+}
+.stat-value.dropped {
+  color: #fdba74;
+}
 
 .workspace {
   display: grid;
@@ -555,6 +567,30 @@ tbody tr:hover {
   color: #a3e635;
   background: rgba(163, 230, 53, 0.1);
   border-color: rgba(163, 230, 53, 0.28);
+}
+
+.action-pill.took {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.1);
+  border-color: rgba(251, 191, 36, 0.28);
+}
+
+.action-pill.put {
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.1);
+  border-color: rgba(52, 211, 153, 0.28);
+}
+
+.action-pill.picked {
+  color: #67e8f9;
+  background: rgba(103, 232, 249, 0.1);
+  border-color: rgba(103, 232, 249, 0.28);
+}
+
+.action-pill.dropped {
+  color: #fdba74;
+  background: rgba(253, 186, 116, 0.1);
+  border-color: rgba(253, 186, 116, 0.28);
 }
 
 .mono {

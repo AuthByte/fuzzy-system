@@ -5,7 +5,11 @@ export type LogAction =
   | "exploded"
   | "opened"
   | "killed"
-  | "hit";
+  | "hit"
+  | "picked"
+  | "dropped"
+  | "took"
+  | "put";
 
 export type LogEvent = {
   id?: number | string;
@@ -16,6 +20,7 @@ export type LogEvent = {
   block: string;
   location: { x: number; y: number; z: number };
   dimension: string;
+  count?: number;
   states?: Record<string, string | number | boolean>;
   source?: string;
 };
@@ -51,6 +56,10 @@ export type Stats = {
   opened: number;
   killed: number;
   hit: number;
+  picked: number;
+  dropped: number;
+  took: number;
+  put: number;
   players: number;
   topPlayers24h: { player: string; c: number }[];
   activityByHour: { hour: string; count: number }[];

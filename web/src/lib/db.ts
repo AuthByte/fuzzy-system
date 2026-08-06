@@ -103,6 +103,10 @@ function normalizeAction(raw: unknown): import("./types").LogAction {
   if (raw === "opened" || raw === "o" || raw === "open") return "opened";
   if (raw === "killed" || raw === "k" || raw === "kill" || raw === "death") return "killed";
   if (raw === "hit" || raw === "h" || raw === "hits" || raw === "attack") return "hit";
+  if (raw === "picked" || raw === "i" || raw === "pickup" || raw === "pick") return "picked";
+  if (raw === "dropped" || raw === "j" || raw === "drop") return "dropped";
+  if (raw === "took" || raw === "u" || raw === "take" || raw === "stolen") return "took";
+  if (raw === "put" || raw === "v" || raw === "deposit" || raw === "deposited") return "put";
   throw new Error(`Invalid action: ${String(raw)}`);
 }
 
@@ -297,6 +301,10 @@ export async function getStats(): Promise<Stats> {
   const opened = rows.filter((r) => r.action === "opened").length;
   const killed = rows.filter((r) => r.action === "killed").length;
   const hit = rows.filter((r) => r.action === "hit").length;
+  const picked = rows.filter((r) => r.action === "picked").length;
+  const dropped = rows.filter((r) => r.action === "dropped").length;
+  const took = rows.filter((r) => r.action === "took").length;
+  const put = rows.filter((r) => r.action === "put").length;
 
   const topMap = new Map<string, number>();
   for (const row of rows) {
@@ -330,6 +338,10 @@ export async function getStats(): Promise<Stats> {
     opened,
     killed,
     hit,
+    picked,
+    dropped,
+    took,
+    put,
     players: players.size,
     topPlayers24h,
     activityByHour,
